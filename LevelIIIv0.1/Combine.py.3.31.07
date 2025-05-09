@@ -1,0 +1,326 @@
+
+import sys, string, os
+
+class MPCFileJoiner:
+    '''
+    a class to operate on global and local models to renumber the global model
+    and glue them into a set of files to run with cptc.
+    '''
+
+    def __init__(self,Gfile,Lfile):
+
+        self.G=Gfile # string obj that contains the global file's first name
+        self.L=Lfile # "      "   "    "        "   local  "      "     "
+
+        fin = open(Lfile+'.nod','r')
+        self.NodeInc = self.Search(fin,0,0)+1
+        fin.close()
+
+        fin = open(Lfile+'.con','r')
+        self.ElemInc = self.Search(fin,0,0)+1
+        fin.close()
+
+        fin = open(Lfile+'.nod','a')
+        fG  = open(Gfile+'.nod','r')
+        self.Append(fin,fG,self.NodeInc,0,0)
+        fin.close()
+        fG.close()
+
+        fin = open(Lfile+'.con','a')
+        fG  = open(Gfile+'.con','r')
+        self.Append(fin,fG,self.ElemInc,4,self.NodeInc)
+        fin.close()
+        fG.close()
+
+        try: 
+            fin = open(Lfile+'.sig','a')
+            fG  = open(Gfile+'.sig','r')
+            self.Append(fin,fG,self.NodeInc,0,0)
+            fin.close()
+            fG.close()
+        except IOError: pass 
+
+        try:
+            fin = open(Lfile+'.edg','a')
+            fG  = open(Gfile+'.edg','r')
+            self.Append(fin,fG,self.NodeInc,3,self.NodeInc)
+            fin.close()
+            fG.close()
+        except IOError: pass 
+
+        try:
+            fin = open(Lfile+'.BC1','w')
+            fG  = open(Gfile+'.BC1','r')
+            self.BC(fin,fG,self.NodeInc)
+            fin.close()
+            fG.close()
+        except IOError: pass 
+
+        try:
+            fin = open(Lfile+'.BC3','w')
+            fG  = open(Gfile+'.BC3','r')
+            self.BC(fin,fG,self.NodeInc)
+            fin.close()
+            fG.close()
+        except IOError: pass 
+
+        try:
+            fin = open(Lfile+'.SrfCVecElems','w')
+            fG  = open(Gfile+'.SrfCVecElems','r')
+            self.BC(fin,fG,self.NodeInc)
+            fin.close()
+            fG.close()
+        except IOError: pass
+
+        try:
+            fin = open(Lfile+'.NormSrfCScalElems','w')
+            fG  = open(Gfile+'.NormSrfCScalElems','r')
+            self.BC(fin,fG,self.NodeInc)
+            fin.close()
+            fG.close()
+        except IOError: pass 
+
+        fin = open('x'+Lfile+'.mpc','r')
+        fout = open(Lfile+'.mpc','w')
+        self.MPC(fin,fout,self.NodeInc)
+        fin.close()
+        fout.close()
+
+        # now add Lfile.BC1 to the MPC file
+        fin = open(Lfile+'.mpc','a')
+        fuse = open(Lfile+'.BC1','r')
+        self.BC12MPC(fin,fuse)
+        fin.close()
+        fuse.close()
+
+################
+
+    def Search(self,fin,rowid,type):
+        '''
+        search the file and return the highest "type" in rowid.
+
+        type = 0 --> integer
+        type = 1 --> float
+        '''
+
+        old_item=-1
+        buff=fin.readline()
+        while buff:
+            list=string.split(buff)
+            buff=fin.readline()
+
+            if type: item=float(list[rowid])
+            else: item=int(list[rowid])
+
+            if item > old_item: 
+                old_item = item
+
+        print old_item
+        return old_item
+
+################
+
+    def Append(self,afile,second,cinc,columid,inc):
+        '''
+        append to afile (use open('blah','a')) with second file incrementing
+        the first column by cinc and columdid to the end of the row by inc. if
+        columid == 0, only increment first column by cinc. 
+        '''
+
+        buff=second.readline()
+        while buff:
+            list=string.split(buff)
+            buff=second.readline()
+
+            list[0]=int(list[0])+cinc
+            if columid:
+                list[columid:] = \
+                        [int(list[i])+inc for i in range(columid,len(list))]
+
+            s=''
+            for p in list: s+=str(p)+' '
+            s=s[0:-1]+"\n"
+
+            afile.write(s)
+
+################
+
+    def BC(self,afile,second,cinc):
+        '''
+        append to afile (use open('blah','a')) with second file incrementing
+        the first column by cinc and columdid to the end of the row by inc. if
+        columid == 0, only increment first column by cinc. 
+        '''
+
+        buff=second.readline()
+        while buff:
+            list=string.split(buff)
+            buff=second.readline()
+
+            list[0]=int(list[0])+cinc
+
+            s=''
+            for p in list: s+=str(p)+' '
+            s=s[0:-1]+"\n"
+
+            afile.write(s)
+
+################
+
+    def MPC(self,fin,fout,inc):
+        '''
+        change node id's of global nodes in mpc file
+        '''
+
+        # the column in the MPC file that tells how many mpc's are coming...
+        # currently column #3... but file formats are always subject to change.
+        numCol=3 
+
+        buff=fin.readline()
+        while buff:
+            list=string.split(buff)
+            buff=fin.readline()
+
+            number=int(list[numCol])
+            for i in range(number):
+                list[numCol+1+(2*i)] = int(list[numCol+1+(2*i)]) + inc
+
+##            # add missing parameter... JD did fix...
+##            list.insert(2,'0')
+
+            s=''
+            for p in list: s+=str(p)+' '
+
+            # strip off the last space
+            s=s[0:-1]+"\n"
+
+            fout.write(s)
+
+################
+
+    def BC12MPC(self,fa,ftran):
+        '''
+        add the type 1 BC's in ftran to the mpc file, fa.  All renumbering
+        was already done in previous steps.  
+        '''
+
+        buff=ftran.readline()
+        while buff:
+            list=string.split(buff)
+            buff=ftran.readline()
+
+            list.insert(2,'1')
+
+            s=''
+            for p in list: s+=str(p)+' '
+            s=s[0:-1]+"0 \n"
+
+            fa.write(s)
+
+################
+
+def SystemStuff(Localfilename,Globalfilename):
+        # rename the appended locafile to ...
+    osString = 'copy /Y '+Localfilename+'.* '+Globalfilename+Localfilename+".*"
+    os.system(osString)
+
+    # restore the original local files.  
+    osString = 'copy /Y x'+Localfilename+'.* '+Localfilename+".*"
+    os.system(osString)
+
+    # remove xLocal files 
+    osString = 'del x'+Localfilename+'.*'
+    os.system(osString)
+
+    # copy to .0 format to run with cptc
+    osString = 'copy /Y '+Globalfilename+Localfilename+".con"+ \
+               ' Elements' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".edg"+ \
+               ' Components' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".mpc"+ \
+               ' MPC' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".nod"+ \
+               ' Nodes' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".rbm"+ \
+               ' RBM' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".smp"+ \
+               ' ShapeMap' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".SrfCVecElems"+ \
+               ' SrfCVecElems' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+Localfilename+".NormSrfCScalElems"+ \
+               ' NormSrfCScalElems' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+".Materials+"+Localfilename+ \
+               ".Materials"+' Materials' 
+    os.system(osString)
+
+    osString = 'copy /Y '+Globalfilename+".smp+"+Localfilename+ \
+               ".smp"+' ShapeMap' 
+    os.system(osString)
+
+################
+
+def HelpPrints():
+    print " " 
+    print " This script reads two finite element models, the Global and the "
+    print " Local, in RDB format and the Local.mpc file.  Then combines them "
+    print " by determining the highest node and element number in the local "
+    print " model and incrementing all numbering in the global model by as "
+    print " much.  "
+    print " ---- " 
+    print " Usage:"
+    print " C:\...>Combine.py [global filename] [local filename] (no extension)] "
+    print " "
+    print " Output:"
+    print " Global+Local.con, .nod, etc."
+    print ' '
+
+################
+
+if __name__=="__main__":
+
+    print "  ************************************************************* "
+    print " * Assumes same shape function mapping and no BCs on local model"
+    print " * Kinematic BC of type 3 are not supported in this script yet"
+    print "  ************************************************************* "
+
+    # a helper for the keys...
+    if "-help" in sys.argv or "-h" in sys.argv:
+        HelpPrints()
+        sys.exit()
+
+    try:
+        Globalfilename=sys.argv[1]
+        Localfilename=sys.argv[2]
+    except IndexError:
+        HelpPrints()
+        sys.exit()
+
+    # keep a copy of the local files
+    osString = 'copy /Y '+Localfilename+'.* x'+Localfilename+".*"
+    os.system(osString)
+
+    # do the merging #######
+    merger = MPCFileJoiner(Globalfilename,Localfilename)
+    # ####### 
+
+    # do a bunch copying and moving and deleting and... 
+    SystemStuff(Localfilename,Globalfilename)
+
+
+

@@ -1,0 +1,367 @@
+# -*- coding: mbcs -*-
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.models['Model-1'].ConstrainedSketch(name='__profile__', sheetSize=200.0)
+mdb.models['Model-1'].sketches['__profile__'].Line(point1=(0.0, 0.0), point2=(
+    15.0, 0.0))
+mdb.models['Model-1'].sketches['__profile__'].HorizontalConstraint(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[2])
+mdb.models['Model-1'].sketches['__profile__'].Line(point1=(15.0, 0.0), point2=(
+    15.0, 15.0))
+mdb.models['Model-1'].sketches['__profile__'].VerticalConstraint(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[3])
+mdb.models['Model-1'].sketches['__profile__'].PerpendicularConstraint(entity1=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[2], entity2=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[3])
+mdb.models['Model-1'].sketches['__profile__'].Line(point1=(15.0, 15.0), point2=
+    (0.0, 15.0))
+mdb.models['Model-1'].sketches['__profile__'].HorizontalConstraint(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[4])
+mdb.models['Model-1'].sketches['__profile__'].PerpendicularConstraint(entity1=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[3], entity2=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[4])
+mdb.models['Model-1'].sketches['__profile__'].Line(point1=(0.0, 15.0), point2=(
+    0.0, 0.0))
+mdb.models['Model-1'].sketches['__profile__'].VerticalConstraint(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[5])
+mdb.models['Model-1'].sketches['__profile__'].PerpendicularConstraint(entity1=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[4], entity2=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[5])
+mdb.models['Model-1'].sketches['__profile__'].Line(point1=(0.0, 0.0), point2=(
+    15.0, 0.0))
+mdb.models['Model-1'].sketches['__profile__'].HorizontalConstraint(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[6])
+mdb.models['Model-1'].sketches['__profile__'].dragEntity(entity=
+    mdb.models['Model-1'].sketches['__profile__'].geometry[5], points=((
+    -1.18464231491e-06, 5.17329263687), (-0.856270194054, 5.17329263687), (
+    -4.99490404129, 5.81549453735), (-7.0642209053, 5.81549453735), (
+    -9.06218147278, 5.81549453735), (-10.2038736343, 5.81549453735), (
+    -12.0591230392, 6.02956151962), (-15.3414878845, 6.3863401413), (
+    -17.6248722076, 6.24362897873), (-19.0519866943, 6.17227315903), (
+    -13.4148826599, 5.88684988022), (-9.34760475159, 5.45871543884), (
+    -7.13557624817, 5.31600427628), (-4.42405796051, 5.10193681717), (
+    -2.71151971817, 5.10193681717), (-1.71253919601, 5.10193681717), (
+    -0.642202973366, 5.10193681717), (0.142710328102, 5.10193681717), (
+    0.856267869473, 5.10193681717), (1.64118111134, 5.10193681717), (
+    2.6401617527, 5.03058099747), (1.49846959114, 5.38735961914), (
+    0.499489068985, 5.53007125854), (-0.856270194054, 5.74413871765), (
+    -2.28338527679, 6.02956151962), (-2.3547410965, 5.88684988022), (
+    1.42711389065, 4.7451581955), (3.21100759506, 4.24566793442), (
+    3.92456531525, 4.03160047531), (2.35473871231, 3.88888907433), (
+    1.49846959114, 3.74617743492), (0.64220058918, 3.67482185364), (
+    -3.85321187973, 2.88990855217), (-7.77777814865, 1.53414916992), (
+    -9.13353729248, 1.17737042904), (-9.6330280304, 1.17737042904)))
+del mdb.models['Model-1'].sketches['__profile__']
+mdb.models['Model-1'].ConstrainedSketch(name='__profile__', sheetSize=200.0)
+mdb.models['Model-1'].sketches['__profile__'].rectangle(point1=(0.0, 0.0), 
+    point2=(15.0, 15.0))
+mdb.models['Model-1'].Part(dimensionality=THREE_D, name='Part-1', type=
+    DEFORMABLE_BODY)
+mdb.models['Model-1'].parts['Part-1'].BaseSolidExtrude(depth=3.0, sketch=
+    mdb.models['Model-1'].sketches['__profile__'])
+del mdb.models['Model-1'].sketches['__profile__']
+del mdb.models['Model-1'].parts['Part-1']
+mdb.models['Model-1'].ConstrainedSketch(name='__profile__', sheetSize=200.0)
+mdb.models['Model-1'].sketches['__profile__'].rectangle(point1=(0.0, 0.0), 
+    point2=(15.0, 15.0))
+mdb.models['Model-1'].Part(dimensionality=THREE_D, name='Part-1', type=
+    DEFORMABLE_BODY)
+mdb.models['Model-1'].parts['Part-1'].BaseSolidExtrude(depth=15.0, sketch=
+    mdb.models['Model-1'].sketches['__profile__'])
+del mdb.models['Model-1'].sketches['__profile__']
+mdb.models['Model-1'].ConstrainedSketch(name='__profile__', sheetSize=200.0)
+mdb.models['Model-1'].sketches['__profile__'].rectangle(point1=(5.0, 5.0), 
+    point2=(10.0, 10.0))
+mdb.models['Model-1'].Part(dimensionality=THREE_D, name='small_cube', type=
+    DEFORMABLE_BODY)
+mdb.models['Model-1'].parts['small_cube'].BaseSolidExtrude(depth=5.0, sketch=
+    mdb.models['Model-1'].sketches['__profile__'])
+del mdb.models['Model-1'].sketches['__profile__']
+mdb.models['Model-1'].rootAssembly.DatumCsysByDefault(CARTESIAN)
+mdb.models['Model-1'].rootAssembly.Instance(dependent=ON, name='Part-1-1', 
+    part=mdb.models['Model-1'].parts['Part-1'])
+mdb.models['Model-1'].rootAssembly.makeIndependent(instances=(
+    mdb.models['Model-1'].rootAssembly.instances['Part-1-1'], ))
+mdb.models['Model-1'].rootAssembly.Instance(dependent=OFF, name='small_cube-1', 
+    part=mdb.models['Model-1'].parts['small_cube'])
+mdb.models['Model-1'].rootAssembly.PartFromBooleanCut(cuttingInstances=(
+    mdb.models['Model-1'].rootAssembly.instances['small_cube-1'], ), 
+    instanceToBeCut=mdb.models['Model-1'].rootAssembly.instances['Part-1-1'], 
+    name='Cut_cube')
+mdb.models['Model-1'].rootAssembly.Instance(dependent=OFF, name='Cut_cube-1', 
+    part=mdb.models['Model-1'].parts['Cut_cube'])
+mdb.models['Model-1'].rootAssembly.suppressFeatures(('small_cube-1', 
+    'Part-1-1'))
+mdb.models['Model-1'].rootAssembly.seedEdgeByNumber(edges=
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].edges.getSequenceFromMask(
+    ('[#ffffff ]', ), ), number=34)
+mdb.models['Model-1'].rootAssembly.seedEdgeByNumber(edges=
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].edges.getSequenceFromMask(
+    ('[#ffffff ]', ), ), number=4)
+mdb.models['Model-1'].rootAssembly.seedEdgeByNumber(edges=
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].edges.getSequenceFromMask(
+    ('[#fff ]', ), ), number=2)
+mdb.models['Model-1'].rootAssembly.setElementType(elemTypes=(ElemType(
+    elemCode=C3D20R, elemLibrary=STANDARD), ElemType(elemCode=C3D15, 
+    elemLibrary=STANDARD), ElemType(elemCode=C3D10M, elemLibrary=STANDARD, 
+    distortionControl=DEFAULT)), regions=(
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].cells.getSequenceFromMask(
+    ('[#1 ]', ), ), ))
+mdb.models['Model-1'].rootAssembly.setMeshControls(elemShape=TET, regions=
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].cells.getSequenceFromMask(
+    ('[#1 ]', ), ), technique=FREE)
+mdb.models['Model-1'].rootAssembly.generateMesh(regions=(
+    mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'], ))
+# Save by jme32 on Tue Feb 06 16:44:07 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.models['Model-1'].DisplacementBC(amplitude=UNSET, createStepName='Initial', 
+    distributionType=UNIFORM, localCsys=None, name='y_surface', region=Region(
+    faces=mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].faces.getSequenceFromMask(
+    mask=('[#100 ]', ), )), u1=UNSET, u2=SET, u3=UNSET, ur1=UNSET, ur2=UNSET, 
+    ur3=UNSET)
+mdb.models['Model-1'].DisplacementBC(amplitude=UNSET, createStepName='Initial', 
+    distributionType=UNIFORM, localCsys=None, name='xyz_point', region=Region(
+    vertices=mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].vertices.getSequenceFromMask(
+    mask=('[#800 ]', ), )), u1=SET, u2=SET, u3=SET, ur1=UNSET, ur2=UNSET, ur3=
+    UNSET)
+mdb.models['Model-1'].DisplacementBC(amplitude=UNSET, createStepName='Initial', 
+    distributionType=UNIFORM, localCsys=None, name='z_point', region=Region(
+    vertices=mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].vertices.getSequenceFromMask(
+    mask=('[#8000 ]', ), )), u1=UNSET, u2=UNSET, u3=SET, ur1=UNSET, ur2=UNSET, 
+    ur3=UNSET)
+mdb.models['Model-1'].StaticStep(name='Step-1', previous='Initial')
+mdb.models['Model-1'].SurfaceTraction(createStepName='Step-1', directionVector=
+    ((0.0, 0.0, 0.0), (0.0, 1.0, 0.0)), distributionType=UNIFORM, field='', 
+    localCsys=None, magnitude=1.0, name='Pull_y', region=Region(
+    side1Faces=mdb.models['Model-1'].rootAssembly.instances['Cut_cube-1'].faces.getSequenceFromMask(
+    mask=('[#40 ]', ), )), traction=GENERAL)
+# Save by jme32 on Tue Feb 06 17:14:21 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.Job(contactPrint=OFF, description='', echoPrint=OFF, explicitPrecision=
+    SINGLE, historyPrint=OFF, model='Model-1', modelPrint=OFF, 
+    multiprocessingMode=DEFAULT, name='Job-1', nodalOutputPrecision=SINGLE, 
+    numCpus=1, numDomains=1, parallelizationMethodExplicit=DOMAIN, preMemory=
+    1500.0, scratch='', standardMemory=1500.0, standardMemoryPolicy=MODERATE, 
+    type=ANALYSIS, userSubroutine='')
+# Save by jme32 on Tue Feb 06 17:16:45 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+del mdb.jobs['Job-1']
+mdb.Job(contactPrint=OFF, description='', echoPrint=OFF, explicitPrecision=
+    SINGLE, historyPrint=OFF, model='Model-1', modelPrint=OFF, 
+    multiprocessingMode=DEFAULT, name='cut_cube', nodalOutputPrecision=SINGLE, 
+    numCpus=1, numDomains=1, parallelizationMethodExplicit=DOMAIN, preMemory=
+    1500.0, scratch='', standardMemory=1500.0, standardMemoryPolicy=MODERATE, 
+    type=ANALYSIS, userSubroutine='')
+mdb.jobs['cut_cube'].submit(consistencyChecking=OFF)
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STARTED, {'phase': BATCHPRE_PHASE, 
+    'clientHost': 'FRACTURE001', 'handle': 1516, 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ERROR, {'phase': BATCHPRE_PHASE, 
+    'message': '720 elements have missing property definitions. The elements have been identified in element set ErrElemMissingSection.', 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(WARNING, {'phase': BATCHPRE_PHASE, 
+    'message': 'NO SECTION DEFINITIONS FOUND', 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ODB_FILE, {'phase': BATCHPRE_PHASE, 
+    'file': 'Z:\\research\\Dissertation\\DDSimLIII\\MPC_verification\\cut_cube.odb', 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ABORTED, {'phase': BATCHPRE_PHASE, 
+    'message': 'Analysis phase failed due to errors', 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ERROR, {
+    'message': 'Analysis Input File Processor exited with an error.', 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(JOB_ABORTED, {
+    'message': 'Analysis Input File Processor exited with an error.', 
+    'jobName': 'cut_cube'})
+mdb.models['Model-1'].Material(name='Material-1')
+mdb.models['Model-1'].materials['Material-1'].Elastic(table=((29000.0, 0.3), ))
+mdb.models['Model-1'].HomogeneousSolidSection(material='Material-1', name=
+    'Section-1', thickness=1.0)
+mdb.models['Model-1'].parts['Cut_cube'].SectionAssignment(offset=0.0, region=
+    Region(
+    cells=mdb.models['Model-1'].parts['Cut_cube'].cells.getSequenceFromMask(
+    mask=('[#1 ]', ), )), sectionName='Section-1')
+# Save by jme32 on Tue Feb 06 18:22:15 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.models['Model-1'].rootAssembly.regenerate()
+mdb.jobs['cut_cube'].submit(consistencyChecking=OFF)
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STARTED, {'phase': BATCHPRE_PHASE, 
+    'clientHost': 'FRACTURE001', 'handle': 600, 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ODB_FILE, {'phase': BATCHPRE_PHASE, 
+    'file': 'Z:\\research\\Dissertation\\DDSimLIII\\MPC_verification\\cut_cube.odb', 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(COMPLETED, {'phase': BATCHPRE_PHASE, 
+    'message': 'Analysis phase complete', 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STARTED, {'phase': STANDARD_PHASE, 
+    'clientHost': 'FRACTURE001', 'handle': 640, 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STEP, {'phase': STANDARD_PHASE, 'stepId': 1, 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ODB_FRAME, {'phase': STANDARD_PHASE, 'step': 0, 
+    'frame': 0, 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STATUS, {'totalTime': 0.0, 'attempts': 0, 
+    'timeIncrement': 1.0, 'increment': 0, 'stepTime': 0.0, 'step': 1, 
+    'jobName': 'cut_cube', 'severe': 0, 'iterations': 0, 
+    'phase': STANDARD_PHASE, 'equilibrium': 0})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(ODB_FRAME, {'phase': STANDARD_PHASE, 'step': 0, 
+    'frame': 1, 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(STATUS, {'totalTime': 1.0, 'attempts': 1, 
+    'timeIncrement': 1.0, 'increment': 1, 'stepTime': 1.0, 'step': 1, 
+    'jobName': 'cut_cube', 'severe': 0, 'iterations': 1, 
+    'phase': STANDARD_PHASE, 'equilibrium': 1})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(END_STEP, {'phase': STANDARD_PHASE, 'stepId': 1, 
+    'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(COMPLETED, {'phase': STANDARD_PHASE, 
+    'message': 'Analysis phase complete', 'jobName': 'cut_cube'})
+mdb.jobs.has_key('cut_cube')
+mdb.jobs['cut_cube']._Message(JOB_COMPLETED, {
+    'time': 'Tue Feb 06 18:22:39 2007', 'jobName': 'cut_cube'})
+# Save by jme32 on Tue Feb 06 18:24:35 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.models.changeKey(fromName='Model-1', toName='Global')
+mdb.Model(name='Local', objectToCopy=mdb.models['Global'])
+mdb.models['Global'].parts.changeKey(fromName='Part-1', toName='Bg_cube')
+del mdb.models['Local'].parts['Part-1']
+del mdb.models['Local'].parts['Cut_cube']
+mdb.models['Local'].rootAssembly.suppressFeatures(featureNames=('Cut_cube-1', 
+    ))
+del mdb.models['Local'].rootAssembly.features['Part-1-1']
+del mdb.models['Local'].rootAssembly.features['small_cube-1']
+del mdb.models['Local'].rootAssembly.features['Cut_cube-1']
+mdb.models['Local'].rootAssembly.Instance(dependent=OFF, name='small_cube-1', 
+    part=mdb.models['Local'].parts['small_cube'])
+# Save by jme32 on Wed Feb 07 14:51:07 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.models['Local'].rootAssembly.seedEdgeByNumber(edges=
+    mdb.models['Local'].rootAssembly.instances['small_cube-1'].edges.getSequenceFromMask(
+    ('[#fff ]', ), ), number=3)
+mdb.models['Local'].rootAssembly.setElementType(elemTypes=(ElemType(
+    elemCode=C3D20R, elemLibrary=STANDARD), ElemType(elemCode=C3D15, 
+    elemLibrary=STANDARD), ElemType(elemCode=C3D10M, elemLibrary=STANDARD, 
+    distortionControl=DEFAULT)), regions=(
+    mdb.models['Local'].rootAssembly.instances['small_cube-1'].cells.getSequenceFromMask(
+    ('[#1 ]', ), ), ))
+mdb.models['Local'].rootAssembly.setMeshControls(elemShape=TET, regions=
+    mdb.models['Local'].rootAssembly.instances['small_cube-1'].cells.getSequenceFromMask(
+    ('[#1 ]', ), ), technique=FREE)
+mdb.models['Local'].rootAssembly.generateMesh(regions=(
+    mdb.models['Local'].rootAssembly.instances['small_cube-1'], ))
+# Save by jme32 on Wed Feb 07 15:09:31 2007
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from mesh import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.Job(contactPrint=OFF, description='', echoPrint=OFF, explicitPrecision=
+    SINGLE, historyPrint=OFF, model='Local', modelPrint=OFF, 
+    multiprocessingMode=DEFAULT, name='Job-2', nodalOutputPrecision=SINGLE, 
+    numCpus=1, numDomains=1, parallelizationMethodExplicit=DOMAIN, preMemory=
+    1500.0, scratch='', standardMemory=1500.0, standardMemoryPolicy=MODERATE, 
+    type=ANALYSIS, userSubroutine='')
+mdb.jobs.changeKey(fromName='Job-2', toName='Local')
+del mdb.models['Local'].steps['Step-1']
+del mdb.models['Local'].boundaryConditions['xyz_point']
+del mdb.models['Local'].boundaryConditions['y_surface']
+del mdb.models['Local'].boundaryConditions['z_point']
+# Save by jme32 on Wed Feb 07 15:17:26 2007
+# Save by jme32 on Thu Feb 08 13:49:17 2007
