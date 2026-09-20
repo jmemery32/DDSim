@@ -11,6 +11,7 @@ import Vec3D as _V
 
 class ColTensor:
     __slots__ = ("ct",)
+    __array_ufunc__ = None      # let numpy scalars defer to our operators
 
     def __init__(self, xx=0.0, yy=0.0, zz=0.0, xy=0.0, yz=0.0, zx=0.0):
         self.ct = [float(xx), float(yy), float(zz), float(xy), float(yz), float(zx)]

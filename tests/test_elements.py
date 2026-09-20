@@ -109,3 +109,24 @@ def test_faces_are_on_the_boundary_and_consistently_oriented(name):
     assert len(set(signs)) == 1
     outward = signs[0] > 0
     print(name, "face normals point", "outward" if outward else "INWARD")
+
+
+@pytest.mark.parametrize("name", ALL)
+def test_newton_kernel_matches_numpy_solve(name):
+    """The compiled Newton solve (Cramer's rule) recovers natural coordinates for
+    a distorted element, checked against an independent np.linalg.solve iteration."""
+    import _kernels as K
+    el = E.ELEMENTS[name]
+    rng = np.random.default_rng(4)
+    nodes = np.array(NODES[name], dtype=float)
+    A = np.array([[2.0, 0.4, 0.1], [0.2, 1.5, 0.3], [0.1, 0.2, 2.5]])
+    X = nodes @ A.T + 0.03 * rng.normal(size=nodes.shape) * (np.abs(nodes) < 1).any(axis=1)[:, None]
+    Xp = np.zeros((20, 3))
+    Xp[:len(X)] = X
+    nc_true = np.array(el.center) + 0.1 * rng.normal(size=3)
+    q = el.shape(nc_true) @ X
+    nc = np.empty(3)
+    ok = K.find_natural(el.code, Xp, q, 1e-12, 30, nc, np.empty(20), np.empty((20, 3)),
+                        np.empty(20, dtype=np.complex128))
+    assert ok
+    assert nc == pytest.approx(nc_true, abs=1e-9)

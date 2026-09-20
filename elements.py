@@ -18,205 +18,100 @@ Brick8        8      r,s,t in [0, 1]                  (1/2,1/2,1/2)
 Brick20       20     r,s,t in [-1, 1]                 (0,0,0)
 ============  =====  ===============================  ==========
 
-Shape-function derivatives are obtained by complex-step differentiation of the
-shape functions.  The shape functions are polynomials, so this is exact to
-machine precision and removes ~300 lines of hand-derived derivative tables (and
-their chance of typos).  Every shape function below therefore uses only
-arithmetic that works on complex numbers.
+The shape functions are implemented once, in :mod:`_kernels` (numba-compiled).
+Their derivatives are obtained by complex-step differentiation: the shape
+functions are polynomials, so this is exact to machine precision and removes
+~300 lines of hand-derived derivative tables (and their chance of typos).
 """
 import numpy as np
+
+import _kernels as _K
 
 _H = 1e-30  # complex-step size; exact for polynomials
 
 
 # ---------------------------------------------------------------------------
-# solid elements
+# solid elements -- thin wrappers over the numba kernels in _kernels.py
 # ---------------------------------------------------------------------------
 class SolidElement:
-    """Reference solid element.  Subclasses implement ``_shape``."""
+    """Reference solid element (shape functions live in :mod:`_kernels`)."""
 
     name = ""
+    code = -1
     num_nodes = 0
     center = (0.0, 0.0, 0.0)
     faces = ()          # tuple of node-index tuples (corner nodes first, then mid-side)
 
     def shape(self, nc):
         """Shape function values at natural coordinates ``nc`` -> ndarray(num_nodes)."""
-        return self._shape(float(nc[0]), float(nc[1]), float(nc[2]))
+        out = np.empty(_K.MAX_NODES)
+        _K.shape_only(self.code, float(nc[0]), float(nc[1]), float(nc[2]), out,
+                      np.empty(_K.MAX_NODES, dtype=np.complex128))
+        return out[:self.num_nodes].copy()
 
     def dshape(self, nc):
         """Shape derivatives d N_k / d nc_j -> ndarray(num_nodes, 3)."""
-        d = np.empty((self.num_nodes, 3))
-        r, s, t = float(nc[0]), float(nc[1]), float(nc[2])
-        d[:, 0] = self._shape(complex(r, _H), s, t).imag / _H
-        d[:, 1] = self._shape(r, complex(s, _H), t).imag / _H
-        d[:, 2] = self._shape(r, s, complex(t, _H)).imag / _H
-        return d
+        n = np.empty(_K.MAX_NODES)
+        d = np.empty((_K.MAX_NODES, 3))
+        _K.shape_dshape(self.code, float(nc[0]), float(nc[1]), float(nc[2]), n, d,
+                        np.empty(_K.MAX_NODES, dtype=np.complex128))
+        return d[:self.num_nodes].copy()
 
     def point_inside(self, nc, tol):
-        raise NotImplementedError
+        return bool(_K.point_inside(self.code, np.asarray(nc, dtype=float), float(tol)))
 
     def nearest_point(self, nc):
-        raise NotImplementedError
+        """Nearest point of the reference element to ``nc`` (in natural coordinates).
 
-    def _shape(self, r, s, t):
-        raise NotImplementedError
-
-
-def _project_onto_simplex(c):
-    """Nearest point to ``c`` on {x >= 0, sum(x) <= 1} (Euclidean projection).
-
-    The 2007 code moved the coordinates by ``-u/3`` with ``u = 1 - sum < 0`` (i.e.
-    the wrong way) and, for the 10-node tet, mixed up r and s; this is the
-    correct projection.  It only affects the reported distance for points that
-    are (slightly) outside an element.
-    """
-    c = np.clip(np.asarray(c, dtype=float), 0.0, None)
-    if c.sum() <= 1.0:
-        return c
-    # projection onto the probability simplex (sort-based algorithm)
-    u = np.sort(c)[::-1]
-    css = np.cumsum(u) - 1.0
-    k = np.nonzero(u - css / (np.arange(len(u)) + 1) > 0)[0][-1]
-    theta = css[k] / (k + 1.0)
-    return np.clip(c - theta, 0.0, None)
+        For the simplex-type elements this is a true Euclidean projection; the 2007
+        code moved the coordinates by ``-u/3`` with ``u = 1 - sum < 0`` (i.e. the wrong
+        way) and, for the 10-node tet, mixed up r and s.  It only affects the
+        reported distance for points that are (slightly) outside an element.
+        """
+        out = np.empty(3)
+        _K.nearest_point(self.code, np.asarray(nc, dtype=float), out)
+        return out
 
 
 class Tet4(SolidElement):
-    name = "TET_4"
-    num_nodes = 4
+    name, code, num_nodes = "TET_4", _K.TET_4, 4
     center = (0.25, 0.25, 0.25)
     faces = ((0, 1, 2), (1, 3, 2), (2, 3, 0), (0, 3, 1))
 
-    def _shape(self, r, s, t):
-        return np.array([r, s, t, 1.0 - r - s - t])
-
-    def point_inside(self, nc, tol):
-        r, s, t = nc
-        u = 1.0 - r - s - t
-        return all(-tol <= v <= 1.0 + tol for v in (r, s, t, u))
-
-    def nearest_point(self, nc):
-        return _project_onto_simplex(nc)
-
 
 class Tet10(SolidElement):
-    name = "TET_10"
-    num_nodes = 10
+    name, code, num_nodes = "TET_10", _K.TET_10, 10
     center = (0.25, 0.25, 0.25)
     faces = ((0, 1, 2, 4, 5, 6), (1, 3, 2, 8, 7, 5),
              (2, 3, 0, 7, 9, 6), (0, 3, 1, 9, 8, 4))
-    point_inside = Tet4.point_inside
-    nearest_point = Tet4.nearest_point
-
-    def _shape(self, r, s, t):
-        u = 1.0 - r - s - t
-        return np.array([(2 * r - 1) * r, (2 * s - 1) * s, (2 * t - 1) * t, (2 * u - 1) * u,
-                         4 * r * s, 4 * s * t, 4 * r * t, 4 * t * u, 4 * s * u, 4 * r * u])
 
 
 class Wedge6(SolidElement):
-    name = "WEDGE_6"
-    num_nodes = 6
+    name, code, num_nodes = "WEDGE_6", _K.WEDGE_6, 6
     center = (1.0 / 3.0, 1.0 / 3.0, 0.5)
     faces = ((0, 3, 4, 1), (2, 5, 3, 0), (1, 4, 5, 2), (0, 1, 2), (3, 5, 4))
 
-    def _shape(self, r, s, t):
-        u = 1.0 - r - s
-        return np.array([r * (1 - t), s * (1 - t), u * (1 - t), r * t, s * t, u * t])
-
-    def point_inside(self, nc, tol):
-        r, s, t = nc
-        u = 1.0 - r - s
-        return all(-tol <= v <= 1.0 + tol for v in (r, s, t, u))
-
-    def nearest_point(self, nc):
-        rs = _project_onto_simplex(nc[:2])
-        return np.array([rs[0], rs[1], min(max(nc[2], 0.0), 1.0)])
-
 
 class Wedge15(SolidElement):
-    name = "WEDGE_15"
-    num_nodes = 15
+    name, code, num_nodes = "WEDGE_15", _K.WEDGE_15, 15
     center = (1.0 / 3.0, 1.0 / 3.0, 0.0)
     faces = ((0, 3, 4, 1, 12, 9, 13, 6), (2, 5, 3, 0, 14, 11, 12, 8),
              (1, 4, 5, 2, 13, 10, 14, 7), (0, 1, 2, 6, 7, 8), (3, 5, 4, 11, 10, 9))
 
-    def _shape(self, r, s, t):
-        u = 1.0 - r - s
-        om, op, t2 = 1.0 - t, 1.0 + t, 1.0 - t * t
-        return np.array([
-            0.5 * u * ((2.0 * u - 1.0) * om - t2),
-            0.5 * s * ((2.0 * s - 1.0) * om - t2),
-            0.5 * r * ((2.0 * r - 1.0) * om - t2),
-            0.5 * u * ((2.0 * u - 1.0) * op - t2),
-            0.5 * s * ((2.0 * s - 1.0) * op - t2),
-            0.5 * r * ((2.0 * r - 1.0) * op - t2),
-            2.0 * u * s * om, 2.0 * s * r * om, 2.0 * r * u * om,
-            2.0 * u * s * op, 2.0 * s * r * op, 2.0 * r * u * op,
-            u * t2, s * t2, r * t2])
-
-    def point_inside(self, nc, tol):
-        r, s, t = nc
-        u = 1.0 - r - s
-        return all(-tol <= v <= 1.0 + tol for v in (r, s, u)) and -(1.0 + tol) <= t <= 1.0 + tol
-
-    def nearest_point(self, nc):
-        rs = _project_onto_simplex(nc[:2])
-        return np.array([rs[0], rs[1], min(max(nc[2], -1.0), 1.0)])
-
 
 class Brick8(SolidElement):
-    name = "BRICK_8"
-    num_nodes = 8
+    name, code, num_nodes = "BRICK_8", _K.BRICK_8, 8
     center = (0.5, 0.5, 0.5)
     faces = ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1),
              (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))
 
-    def _shape(self, r, s, t):
-        return np.array([(1.0 - r) * (1.0 - s) * (1.0 - t), (1.0 - r) * (1.0 - s) * t,
-                         (1.0 - r) * s * (1.0 - t), (1.0 - r) * s * t,
-                         r * (1.0 - s) * (1.0 - t), r * (1.0 - s) * t,
-                         r * s * (1.0 - t), r * s * t])
-
-    def point_inside(self, nc, tol):
-        return all(-tol <= v <= 1.0 + tol for v in nc)
-
-    def nearest_point(self, nc):
-        return np.clip(np.asarray(nc, dtype=float), 0.0, 1.0)
-
 
 class Brick20(SolidElement):
-    name = "BRICK_20"
-    num_nodes = 20
+    name, code, num_nodes = "BRICK_20", _K.BRICK_20, 20
     center = (0.0, 0.0, 0.0)
     faces = ((0, 1, 3, 2, 8, 13, 9, 12), (4, 6, 7, 5, 14, 11, 15, 10),
              (0, 4, 5, 1, 16, 10, 17, 8), (2, 3, 7, 6, 9, 19, 11, 18),
              (0, 2, 6, 4, 12, 18, 14, 16), (1, 5, 7, 3, 17, 15, 19, 13))
-
-    def _shape(self, r, s, t):
-        r2, s2, t2 = r * r, s * s, t * t
-        return np.array([
-            0.125 * (1 - r) * (1 - s) * (1 - t) * (-r - s - t - 2.0),
-            0.125 * (1 - r) * (1 - s) * (1 + t) * (-r - s + t - 2.0),
-            0.125 * (1 - r) * (1 + s) * (1 - t) * (-r + s - t - 2.0),
-            0.125 * (1 - r) * (1 + s) * (1 + t) * (-r + s + t - 2.0),
-            0.125 * (1 + r) * (1 - s) * (1 - t) * (r - s - t - 2.0),
-            0.125 * (1 + r) * (1 - s) * (1 + t) * (r - s + t - 2.0),
-            0.125 * (1 + r) * (1 + s) * (1 - t) * (r + s - t - 2.0),
-            0.125 * (1 + r) * (1 + s) * (1 + t) * (r + s + t - 2.0),
-            0.25 * (1 - r) * (1 - s) * (1 - t2), 0.25 * (1 - r) * (1 + s) * (1 - t2),
-            0.25 * (1 + r) * (1 - s) * (1 - t2), 0.25 * (1 + r) * (1 + s) * (1 - t2),
-            0.25 * (1 - r) * (1 - s2) * (1 - t), 0.25 * (1 - r) * (1 - s2) * (1 + t),
-            0.25 * (1 + r) * (1 - s2) * (1 - t), 0.25 * (1 + r) * (1 - s2) * (1 + t),
-            0.25 * (1 - r2) * (1 - s) * (1 - t), 0.25 * (1 - r2) * (1 - s) * (1 + t),
-            0.25 * (1 - r2) * (1 + s) * (1 - t), 0.25 * (1 - r2) * (1 + s) * (1 + t)])
-
-    def point_inside(self, nc, tol):
-        return all(-(1.0 + tol) <= v <= 1.0 + tol for v in nc)
-
-    def nearest_point(self, nc):
-        return np.clip(np.asarray(nc, dtype=float), -1.0, 1.0)
 
 
 TET_4, TET_10, WEDGE_6, WEDGE_15, BRICK_8, BRICK_20 = (

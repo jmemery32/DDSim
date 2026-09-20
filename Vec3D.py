@@ -19,6 +19,9 @@ def _is_num(o):
 
 class Vec3D:
     __slots__ = ("_v",)
+    # Make numpy scalars/arrays defer to our operators: without this,
+    # ``np.float64(2) * v`` sees a sequence and returns an ndarray.
+    __array_ufunc__ = None
 
     def __init__(self, x, y, z):
         self._v = [float(x), float(y), float(z)]

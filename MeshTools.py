@@ -26,12 +26,11 @@ Deliberate differences from the 2007 implementation
 * The range tree is replaced by a uniform grid over the element bounding boxes.
 * The nodal displacement field is not stored (it was a hard-wired zero vector).
 """
-import itertools
-
 import numpy as np
 
 import ColTensor as _CT
 import Vec3D as _V
+import _kernels as _K
 import elements as _E
 import mesh_io as _io
 
@@ -56,7 +55,7 @@ class MeshTools:
 
     def __init__(self, name=None, model_type='RDB', data=None):
         self.PointInsideTol = 1.0e-7
-        self._cached = None            # (element index, element class, node coords)
+        self._cached = None            # index of the element the last query landed in
         self._max_min = None
         if data is None:
             if model_type == 'RDB':
@@ -81,6 +80,23 @@ class MeshTools:
         self._enodes = [[int(n) for n in c] for c in data.connectivity]
         self._erows = [np.array([self._row[n] for n in c]) for c in self._enodes]
 
+        # padded arrays for the compiled point-location kernels
+        m = len(self._erows)
+        self._code = np.array([e.code for e in self._eclass], dtype=np.int64)
+        self._conn = np.zeros((m, _K.MAX_NODES), dtype=np.int64)
+        for i, rows in enumerate(self._erows):
+            self._conn[i, :len(rows)] = rows
+        self._xyz = np.ascontiguousarray(self._xyz)
+        self._sig = np.ascontiguousarray(self._sig)
+        # scratch buffers (a MeshTools object is not thread-safe; processes are fine)
+        self._nc = np.empty(3)
+        self._near = np.empty(3)
+        self._X = np.empty((_K.MAX_NODES, 3))
+        self._N = np.empty(_K.MAX_NODES)
+        self._dN = np.empty((_K.MAX_NODES, 3))
+        self._tmp = np.empty(_K.MAX_NODES, dtype=np.complex128)
+        self._out6 = np.empty(6)
+
         self._build_bounding_boxes()
         self._build_reverse_connectivity()
         self._build_surface_mesh()
@@ -94,16 +110,19 @@ class MeshTools:
         pad = _BOX_PAD * np.linalg.norm(hi - lo, axis=1)[:, None]
         self._lo, self._hi = lo - pad, hi + pad
 
-        # uniform grid: each element is registered in every cell its box touches
+        # uniform grid over the boxes (compiled CSR layout, see _kernels.build_grid)
         extent = (self._hi - self._lo).max(axis=1)
-        self._origin = self._lo.min(axis=0)
-        self._cell = float(np.median(extent)) if m else 1.0
-        self._grid = {}
-        ilo = np.floor((self._lo - self._origin) / self._cell).astype(int)
-        ihi = np.floor((self._hi - self._origin) / self._cell).astype(int)
-        for i in range(m):
-            for c in itertools.product(*(range(ilo[i, k], ihi[i, k] + 1) for k in range(3))):
-                self._grid.setdefault(c, []).append(i)
+        self._origin = np.ascontiguousarray(self._lo.min(axis=0))
+        cell = float(np.median(extent)) if m else 1.0
+        span = self._hi.max(axis=0) - self._origin
+        while np.prod(np.floor(span / cell) + 1.0) > 2.0e7:      # keep the grid small
+            cell *= 1.5
+        self._inv_cell = 1.0 / cell
+        self._dims = (np.floor(span * self._inv_cell).astype(np.int64) + 1)
+        self._lo = np.ascontiguousarray(self._lo)
+        self._hi = np.ascontiguousarray(self._hi)
+        self._cell_start, self._cell_items = _K.build_grid(
+            self._lo, self._hi, self._origin, self._inv_cell, self._dims)
 
     def _build_reverse_connectivity(self):
         self._rev = {}
@@ -225,83 +244,43 @@ class MeshTools:
     def _as_point(pt):
         return np.array([pt[0], pt[1], pt[2]], dtype=float)
 
-    def _candidates(self, q):
-        cell = tuple(np.floor((q - self._origin) / self._cell).astype(int))
-        idx = self._grid.get(cell)
-        if not idx:
-            return []
-        idx = np.array(idx)
-        inside = np.all((self._lo[idx] <= q) & (q <= self._hi[idx]), axis=1)
-        return idx[inside].tolist()
-
-    def _find_natural(self, el, X, q):
-        """Newton iteration for the natural coordinates of ``q`` in an element.
-
-        Returns the natural coordinates, or ``None`` if it did not converge.
-        """
-        tol = self.PointInsideTol
-        nc = np.array(el.center, dtype=float)
-        for _ in range(_MAX_ITS):
-            guess = el.shape(nc) @ X
-            jac = el.dshape(nc).T @ X            # jac[i, j] = d x_j / d nc_i
-            try:
-                update = np.linalg.solve(jac.T, guess - q)
-            except np.linalg.LinAlgError:
-                return None
-            new = nc - update
-            if not np.all(np.isfinite(new)):
-                return None
-            if np.any(np.abs(new - nc) > tol):
-                nc = new
-            else:
-                return new
-        return None
-
     def _pt_query(self, q):
-        """-> (status, element index, element class, natural coords, distance)."""
-        tol = self.PointInsideTol
-
-        # first try the element the previous query landed in, with a negative
-        # tolerance so a point close to a shared face is re-searched properly
-        if self._cached is not None:
-            i, el, X = self._cached
-            nat = self._find_natural(el, X, q)
-            if nat is not None and el.point_inside(nat, -tol):
-                return -2, i, el, nat, 0.0
-
-        cand = self._candidates(q)
-        if not cand:
-            return -3, None, None, None, 0.0
-
-        rvalue = -1
-        best = None                                   # (dist, element idx, class, nat)
-        for i in cand:
-            el = self._eclass[i]
-            X = self._xyz[self._erows[i]]
-            nat = self._find_natural(el, X, q)
-            if nat is None:                           # did not converge
-                rvalue = self._elem_ids[i]
-                continue
-            if el.point_inside(nat, tol):
-                self._cached = (i, el, X)
-                return -2, i, el, nat, 0.0
-            surf = el.nearest_point(nat)
-            dist = float(np.linalg.norm(q - el.shape(surf) @ X))
-            if best is None or dist < best[0]:
-                best = (dist, i, el, surf)
-
-        if best is None:                              # nothing converged
-            return rvalue, None, None, None, 0.0
-
-        # the point is (numerically) just outside: report the nearest element
-        self._cached = None
-        dist, i, el, surf = best
-        return -1, i, el, surf, dist
+        """-> (status, element index, natural coords, distance); see the module docstring."""
+        cached = -1 if self._cached is None else self._cached
+        nat = np.empty(3)
+        status, i, dist = _K.pt_query(
+            q, cached, self.PointInsideTol, _MAX_ITS, self._origin, self._inv_cell,
+            self._dims, self._cell_start, self._cell_items, self._lo, self._hi,
+            self._code, self._conn, self._xyz, nat, self._nc, self._X, self._N,
+            self._dN, self._tmp, self._near)
+        if status == -2:
+            self._cached = i
+        elif status == -1:
+            self._cached = None
+        return status, i, nat, dist
 
     def IsPointOutsideMesh(self, pt):
         """-> (status, distance); see the module docstring for the status codes."""
-        status, _, _, _, dist = self._pt_query(self._as_point(pt))
+        status, i, _, dist = self._pt_query(self._as_point(pt))
+        if status == -4:                    # Newton did not converge: report the element id
+            return self._elem_ids[i], 0.0
         return status, dist
+
+    def GetPtStresses(self, points):
+        """Stress at many points at once: ``(n, 3)`` array-like -> ``(n, 6)`` ndarray
+        with columns (sxx, syy, szz, sxy, syz, szx).  Raises ``EmptySearchResult`` if
+        any point is not in, or just next to, the mesh."""
+        pts = np.ascontiguousarray(points, dtype=float).reshape(-1, 3)
+        out = np.empty((len(pts), 6))
+        cached = -1 if self._cached is None else self._cached
+        done, cached = _K.stress_batch(
+            pts, cached, self.PointInsideTol, _MAX_ITS, self._origin, self._inv_cell,
+            self._dims, self._cell_start, self._cell_items, self._lo, self._hi,
+            self._code, self._conn, self._xyz, self._sig, out)
+        self._cached = None if cached < 0 else int(cached)
+        if done < len(pts):
+            raise EmptySearchResult("empty range tree search")
+        return out
 
     def GetPtStress(self, pt):
         """Stress tensor (ColTensor) interpolated at ``pt``.
@@ -309,7 +288,4 @@ class MeshTools:
         Raises ``EmptySearchResult`` if the point is not in, or just next to,
         the mesh.
         """
-        status, i, el, nat, _ = self._pt_query(self._as_point(pt))
-        if status not in (-1, -2):
-            raise EmptySearchResult("empty range tree search")
-        return _CT.ColTensor(*(el.shape(nat) @ self._sig[self._erows[i]]))
+        return _CT.ColTensor(*self.GetPtStresses(self._as_point(pt))[0])

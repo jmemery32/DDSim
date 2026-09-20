@@ -87,3 +87,13 @@ def test_jvt():
     assert JVT.Star([2, 3], [4, 5]) == [8, 15]
     assert JVT.Divide([8, 9], [2, 3]) == [4, 3]
     assert JVT.ScalarMult([1, 2], 3) == [3, 6]
+
+
+def test_numpy_scalars_defer_to_vec3d_operators():
+    v = Vec3D.Vec3D(1, 2, 3)
+    for k in (np.float64(2.0), np.float32(2.0), np.int64(2)):
+        for r in (k * v, v * k):
+            assert isinstance(r, Vec3D.Vec3D) and list(r) == [2, 4, 6]
+    assert isinstance(np.float64(1.0) + v, Vec3D.Vec3D)
+    t = ColTensor(1, 2, 3, 4, 5, 6)
+    assert isinstance(np.float64(2.0) * t, ColTensor)
