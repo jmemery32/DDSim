@@ -1155,7 +1155,7 @@ class Fellipse(Damage):
 
 ######## Fellipse
 
-    def GeometryCheck(self,CMesh): 
+    def GeometryCheck(self,CMesh,_rotations_tried=0): 
         '''
         Determines if the Fellipse is the appropriate type of damage
         element, based on geometry.
@@ -1208,8 +1208,14 @@ class Fellipse(Damage):
         # self.Rotation so that crack is perpendicular to second principal
         # stress and recurse! 
         elif len(PhiList)==0 and CheckList[0]==0:
+            # There are only two orientations to try (sigma_1 and sigma_2
+            # normal).  The 2007 code recursed without a bound, so an ellipse
+            # that stays outside in both (e.g. uniaxial stress, where sigma_2 =
+            # sigma_3) died with a RecursionError.  After two tries, treat it like
+            # any other crack that has outgrown its body: net fracture (4).
+            if _rotations_tried >= 2: return 4,0
             self.__ChangeRotationToSecondPrincipal()
-            return self.GeometryCheck(CMesh)
+            return self.GeometryCheck(CMesh,_rotations_tried+1)
 
         # if len(PhiList) > 4 assume that means the ellipse is larger than its
         # surroundings and is therefore grown as much as possible.  Set

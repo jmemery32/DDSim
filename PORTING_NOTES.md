@@ -112,3 +112,40 @@ exceptions are not indexable (`message[0]` -> `message.args[0]`, 16 sites).
 `Fellipse.GrowDam` in `DamClass.py` is dead code (only `DamMo.GrowDam` is called).
 `Fellipse`/`Hellipse` are chosen by `GeometryCheck` (surface nodes become
 `Hellipse`), not by the caller.
+
+## Performance work (numba)
+
+Everything below leaves the golden life predictions unchanged (bit-identical
+for nodes 10 and 0, checked before and after each step; `tests/test_end_to_end.py`).
+
+| step | example1 node 10 (scale 100) | node 0 (scale 60) |
+|---|---|---|
+| pure Python/numpy (before) | 7.5 s | ~139 s |
+| + compiled shape functions / Newton / point query (`_kernels.py`) | 1.7 s | 5.1 s |
+| + one batched stress call per SIF (`__FitPolynomial`) | 1.4 s | 3.6 s |
+| + compiled ellipse/triangle crossings (`_geom_kernels.py`) | 1.2 s | 3.7 s |
+| + fused normal-stress sampling (`MeshTools.NormalStressSamples`) | 1.2 s | 2.9 s |
+
+(Wall time including ~0.5 s of interpreter/numba-cache start-up.)  All 35 nodes of
+example1 at scale 100 run serially in 23.5 s.
+
+Design: the readable numpy versions are kept next to the kernels (e.g.
+`GeomUtils._crossings_reference`, `elements.py` wrappers) and tests compare the two.
+`numba` caches compiled code in `__pycache__/`; the first run after a change to a
+kernel takes a few extra seconds to recompile.
+
+## Robustness fix (behavior change)
+
+`Fellipse.GeometryCheck` recursed without bound when the whole ellipse lay outside
+the body ("rotate to the second principal stress and recurse"). There are only two
+orientations (sigma_1 / sigma_2 normal), so it now stops after two attempts and
+returns status 4 (net fracture, crack outgrew the body) like the other "outgrew the
+body" paths. Under uniaxial stress (sigma_2 = sigma_3, as in example1) the 2007 code
+died with a RecursionError for any interior crack that outgrew the cube.
+
+## Verification worth knowing about
+
+* Cube symmetry: the eight corner nodes of example1 give the same life to ~1e-10
+  relative (a direction-dependent bug would break this) -- `test_cube_symmetry_*`.
+* `np.float64 * Vec3D` used to return an ndarray (numpy saw a sequence); fixed with
+  `__array_ufunc__ = None` on `Vec3D` / `ColTensor`. It only bit on corner nodes.

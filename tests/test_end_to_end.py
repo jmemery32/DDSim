@@ -51,3 +51,24 @@ def test_life_predictions_match_golden(tmp_path, nodes, scale):
     for doid, (life, will_grow) in expected.items():
         assert got[doid][1] == will_grow
         assert got[doid][0] == pytest.approx(life, rel=1e-9)
+
+
+def test_cube_symmetry_all_eight_corners_have_the_same_life(tmp_path):
+    """The cube and its uniform stress are symmetric, so the eight corner nodes must
+    give the same life whatever their orientation relative to the load.  This
+    catches direction-dependent bugs (surface normals, crack frames, mesh
+    orientation) that a single-node golden value cannot."""
+    got = run_driver(tmp_path, "0,1,2,3,4,5,6,7", "100")
+    assert sorted(got) == list(range(8))
+    lives = [got[d][0] for d in range(8)]
+    assert all(got[d][1] == 2 for d in range(8))
+    assert lives == pytest.approx([lives[0]] * 8, rel=1e-8)
+    assert lives[0] == pytest.approx(1016.3402594280, rel=1e-8)
+
+
+def test_interior_node_with_uniaxial_stress_does_not_recurse_forever(tmp_path):
+    """Node 8 (cube centre) outgrows the cube; under uniaxial stress sigma_2 = sigma_3,
+    so re-orienting the crack never helps.  The 2007 code died with a RecursionError."""
+    got = run_driver(tmp_path, "8", "100")
+    assert got[8][1] == 4                          # net fracture: outgrew the body
+    assert got[8][0] == pytest.approx(2002.2414166064946, rel=1e-8)
