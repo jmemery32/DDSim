@@ -93,3 +93,22 @@ Other things the compiled `dadN.pyd` did differently from `MydadN.py`, now align
   branch returned an uninitialised value in the C++).
 * Debug `cout` output of the C++ (it printed every crossing) is gone.
 * `IsPointIn` at `DamClass.py:3871` -- still to be checked.
+
+## First end-to-end status
+
+`examples/example1/` (12 quadratic tets, uniform syy = 3.4, `example1.par`) runs
+through `DDSim.py` under Python 3.11:
+
+    cd examples/example1
+    python ../../DDSim.py -base example1 -conpath ./ -parpath ./ -v -doid_list 10 -scale 60
+
+`tests/test_sif_validation.py` checks the stress intensity factors against
+closed-form solutions: embedded elliptical cracks match Irwin to 4 decimals and
+the surface half-penny matches Newman-Raju to 5 decimals (the 2007 surface
+solution *is* Newman-Raju).
+
+Other port fixes found by running it: `time.clock()` (removed in Python 3.8),
+exceptions are not indexable (`message[0]` -> `message.args[0]`, 16 sites).
+`Fellipse.GrowDam` in `DamClass.py` is dead code (only `DamMo.GrowDam` is called).
+`Fellipse`/`Hellipse` are chosen by `GeometryCheck` (surface nodes become
+`Hellipse`), not by the caller.

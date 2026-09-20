@@ -1,0 +1,26 @@
+# DDSim Level I smoke test: 20 x 20 x 20 cube of 12 quadratic tets, uniform syy = 3.4.
+# Run with a K scale factor so the stress is realistic, e.g.  -scale 100  (340 MPa).
+#
+# Material: 7075-T651 (mm, MPa).  From Emery et al., EFM 76 (2009), Table 1:
+#   Kie, Kic, DK1, C, n, p, q, Cthm, Cthp, Ak, Bk, Smax/sigma0, alpha, a0, n', damp, Rso.
+# ASSUMED (not in the paper's table): UTS 572, YS 503, Rcl 0.7, R 0.1.
+#
+# order: UTS YS Kie Kic Ak Bk C n p q DK1 Cthp Cthm Rcl alpha Smax/SIG0 R a0 n' damp Rso
+a_b
+0.01 0.01
+material
+572.0 503.0 1320.0 972.7 0.75 2.0 3.0e-8 2.8 0.5 1.0 24.32 1.3 0.1 0.7 2.0 0.3 0.1 0.00381 3.5 1000.0 3.0
+dN
+1000.0
+max_error
+0.01
+N_max
+1000000
+min_inc
+1.0e-6
+monte
+0
+ratio
+1.1
+MaxCrack
+5.0

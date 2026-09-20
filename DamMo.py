@@ -288,8 +288,8 @@ class DamModel:
             except DamErrors.FitPolyError as message:
                 if self.verbose:
                     print((' switch to one step fwd Euler for', \
-                          message[0],'at doid', doid, 'due to'))
-                    print(('     ', message[1]))
+                          message.args[0],'at doid', doid, 'due to'))
+                    print(('     ', message.args[1]))
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
@@ -297,7 +297,7 @@ class DamModel:
             except DamErrors.dAdNError as message:
                 if self.verbose:
                     print((' switch to one step fwd Euler for', \
-                          message[0],'at doid', doid, 'due to',message[1]))
+                          message.args[0],'at doid', doid, 'due to',message.args[1]))
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
@@ -306,7 +306,7 @@ class DamModel:
                 if self.verbose:
                     print((' switch to one step fwd Euler for Fellipse', \
                           'at doid', doid, 'due to'))
-                    print(('     ', message[0])) 
+                    print(('     ', message.args[0])) 
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0

@@ -1398,7 +1398,7 @@ if __name__ == "__main__":
     main coding stars here... 
     '''
 
-    time.clock()
+    time.process_time()
 
     # a helper for the keys...
     if "-help" in sys.argv or "-h" in sys.argv:
@@ -1577,18 +1577,18 @@ if __name__ == "__main__":
     if local_node or data_base:
         #variable extension named on line 545 above... msti_rank
         Timefile=open(parpath+filename+'.time.'+extension,'w')
-        Timefile.write(str(time.clock())+"\n")
+        Timefile.write(str(time.process_time())+"\n")
         Timefile.close()
     else:
         Timefile=open(parpath+filename+'.time','w')
-        Timefile.write(str(time.clock())+"\n")
+        Timefile.write(str(time.process_time())+"\n")
         Timefile.close()
 
     if verbose: 
         print('')
         print('            ---------------------------------------------------')
         print('            This run ended at:', time.asctime(time.localtime()))
-        print('            For a total elapsed time of (s):', time.clock())
+        print('            For a total elapsed time of (s):', time.process_time())
         print('            ---------------------------------------------------')
 
 ############## bottom ##################

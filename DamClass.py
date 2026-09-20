@@ -753,8 +753,8 @@ class Fellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1])) 
+                print((' FitPoly dumped for', message.args[0], 'at doid', self.doid,\
+                      'due to',message.args[1])) 
                 print(' **SIMULATION OK, means crack has out grown its welcome')
             return 4
 
@@ -972,8 +972,8 @@ class Fellipse(Damage):
             except FitPolyDump as message:
                 if self.verbose:
                     print((' switch to one step fwd Euler for', \
-                          message[0],'at doid', self.doid, 'due to'))
-                    print(('     ', message[1]))
+                          message.args[0],'at doid', self.doid, 'due to'))
+                    print(('     ', message.args[1]))
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
@@ -981,7 +981,7 @@ class Fellipse(Damage):
             except dAdNError as message:
                 if self.verbose:
                     print((' switch to one step fwd Euler for', \
-                          message[0],'at doid', self.doid, 'due to',message[1]))
+                          message.args[0],'at doid', self.doid, 'due to',message.args[1]))
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
@@ -990,7 +990,7 @@ class Fellipse(Damage):
                 if self.verbose:
                     print((' switch to one step fwd Euler for Fellipse', \
                           'at doid', self.doid, 'due to'))
-                    print(('     ', message[0])) 
+                    print(('     ', message.args[0])) 
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
@@ -2534,8 +2534,8 @@ class Hellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1])) 
+                print((' FitPoly dumped for', message.args[0], 'at doid', self.doid,\
+                      'due to',message.args[1])) 
                 print(' **SIMULATION OK, means crack has out grown its welcome')
             return 4
 
@@ -3491,8 +3491,8 @@ class Qellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1])) 
+                print((' FitPoly dumped for', message.args[0], 'at doid', self.doid,\
+                      'due to',message.args[1])) 
                 print('** SIMULATION OK, means crack has out grown its welcome')
             # remove the last stuff in DamHistory because we couldn't compute
             # corresponding K's.
