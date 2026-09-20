@@ -212,3 +212,37 @@ def test_offset_center_and_tilted_plane_matches_brute_force():
             assert th == pytest.approx(brute, abs=2 * (theta[1] - theta[0]))
         else:
             assert len(th) < len(brute)
+
+
+# ---------------------------------------------------------------------------
+# compiled kernels vs the readable numpy reference
+# ---------------------------------------------------------------------------
+def test_point_in_triangle_kernel_matches_reference():
+    import _geom_kernels as GK
+    rng = np.random.default_rng(9)
+    for _ in range(300):
+        tri = rng.normal(size=(3, 3))
+        # points in the triangle's plane: inside, outside, on edges, on vertices
+        w = rng.dirichlet([1, 1, 1])
+        candidates = [w @ tri, tri[0], tri[1], 0.5 * (tri[0] + tri[1]), 0.5 * (tri[1] + tri[2]),
+                      tri[0] + 3 * (tri[1] - tri[0]), (w * [2.5, -1.0, -0.5]) @ tri]
+        for p in candidates:
+            assert GK.point_in_triangle(np.array(p), tri) == G.PointInFacet(p, tri)
+
+
+def test_crossings_kernel_matches_reference():
+    rng = np.random.default_rng(12)
+    total = 0
+    for trial in range(40):
+        mesh = G.BuildSurfMeshCObject(cube_facets(rng.uniform(0.8, 1.8)))
+        q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+        e1, e2 = q[:, 0], q[:, 1]
+        center = rng.uniform(-0.4, 0.4, 3)
+        a, b = rng.uniform(0.5, 2.6), rng.uniform(0.5, 2.6)
+        ids = np.arange(len(mesh))
+        fast = G._crossings(mesh, ids, center, e1, e2, a, b)
+        ref = G._crossings_reference(mesh, ids, center, e1, e2, a, b)
+        assert [(j, t) for _, j, t in fast] == [(j, t) for _, j, t in ref]
+        assert [h[0] for h in fast] == pytest.approx([h[0] for h in ref], abs=1e-12)
+        total += len(ref)
+    assert total > 40                       # the comparison actually saw crossings

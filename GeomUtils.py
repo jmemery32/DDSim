@@ -33,6 +33,8 @@ import math
 
 import numpy as np
 
+import _geom_kernels as _GK
+
 _TWO_PI = 2.0 * math.pi
 _GL_X, _GL_W = np.polynomial.legendre.leggauss(9)
 
@@ -209,6 +211,19 @@ def _ellipse_point(center, e1, e2, a, b, theta):
 
 def _crossings(mesh, tri_ids, center, e1, e2, a, b):
     """[(theta, j, triangle)] for all crossings of the ellipse with the triangles."""
+    ids = np.ascontiguousarray(tri_ids, dtype=np.int64)
+    th = np.empty(2 * len(ids))
+    js = np.empty(2 * len(ids), dtype=np.int64)
+    ts = np.empty(2 * len(ids), dtype=np.int64)
+    n = _GK.crossings(mesh.tri, mesh.normal, mesh.offset, ids,
+                      np.ascontiguousarray(center, dtype=float), np.ascontiguousarray(e1, dtype=float),
+                      np.ascontiguousarray(e2, dtype=float), float(a), float(b), th, js, ts)
+    return [(float(th[i]), int(js[i]), int(ts[i])) for i in range(n)]
+
+
+def _crossings_reference(mesh, tri_ids, center, e1, e2, a, b):
+    """Readable numpy version of :func:`_crossings` (used by the tests to cross-check
+    the compiled kernel)."""
     hits = []
     for t in tri_ids:
         n, d = mesh.normal[t], mesh.offset[t]
