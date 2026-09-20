@@ -42,6 +42,31 @@ def DumpFile(xlist,ylist,filename):
 ##############################################################################
 ##############################################################################
 
+
+def _stress_normal_to_crack(model,Rotation,center,ypnts,zpnts):
+    '''
+    Normal stress on the crack plane at the points  center + y*e2 + z*e3  for
+    every (y,z) pair (y varying slowest), followed by the value at ``center``.
+
+    Rotation's rows are the crack frame: e1 (the crack normal), e2, e3.  All
+    points go to the mesh in ONE batched query (GetPtStresses) and the normal
+    component  e1 . sigma . e1  is evaluated with the same expression, in the same
+    operation order, as the original one-point-at-a-time loops.
+    '''
+    A = Rotation[0][0]
+    B = Rotation[0][1]
+    C = Rotation[0][2]
+    y = np.repeat(np.asarray(ypnts,dtype=float),len(zpnts))
+    z = np.tile(np.asarray(zpnts,dtype=float),len(ypnts))
+    pts = np.empty((len(y)+1,3))
+    for k in range(3):
+        pts[:-1,k] = center[k] + (Rotation[1][k]*y+Rotation[2][k]*z)
+        pts[-1,k] = center[k]
+    sig = model.GetPtStresses(pts)      # columns: xx yy zz xy yz zx
+    xx,yy,zz,xy,yz,zx = (sig[:,i] for i in range(6))
+    return A*A*xx + B*B*yy + C*C*zz + 2.0*A*B*xy + 2.0*A*C*zx + 2.0*B*C*yz
+
+
 class Damage:
     '''
     A parent class to Fellipse, Hellipse, Qellipse.  Does some basic things...
@@ -1677,63 +1702,12 @@ class Fellipse(Damage):
         find the biquadratic curve that best fits the stress field normal to
         the crack surface.
         '''
-        # initialize least square problem:
-        #           XY * coef = f
-        # XY is rectangular
+        # least squares problem:  XY * coef = f   (XY is rectangular)
         ypnts=[-aa,0.0,aa]
         zpnts=[-bb,0.0,bb]
-
-##        inc=100
-##        ypnts=[aa*(float(i)*(2.0/float(inc))-1.0) for i in range(inc+1)]
-##        zpnts=[bb*(float(i)*(2.0/float(inc))-1.0) for i in range(inc+1)]
-##        print ypnts
-##        print zpnts
-        f=[]
-        XY=[]
-        A = self.Rotation[0][0]
-        B = self.Rotation[0][1]
-        C = self.Rotation[0][2]
-        # get stress at each sample point
-
-        for y in ypnts: 
-            for z in zpnts:
-                # u = np.dot(self.TRotation,[0,y,z])
-                u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
-                u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
-                u2=self.Rotation[1][2]*y+self.Rotation[2][2]*z
-                # pnt = center + Vec3D.Vec3D(u[0],u[1],u[2])
-                qpnt=center+Vec3D.Vec3D(u0,u1,u2)
-                sig=self.model.GetPtStress(qpnt)
-
-                # GetPtStress returns a ColTensor, arrange to use Numeric the 
-                # global stress tensor is...
-                sigG=[[sig.xx(), sig.xy(), sig.zx()],
-                      [sig.xy(), sig.yy(), sig.yz()],
-                      [sig.zx(), sig.yz(), sig.zz()]]
-
-                # sigL = R*sigG*R'
-                #R_sigG=np.dot(self.Rotation,sigG)
-                #sigL=np.dot(R_sigG,self.TRotation)
-
-                # fill matrix and right-hand-side vector
-                #f+=[sigL[0][0]]
-                XY+=[[y, z, y*y, y*z, z*z, 1.0]]
-                f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-                   +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-
-        # add the center of ellipse...
-        sig=self.model.GetPtStress(center)
-
-        sigG=[[sig.xx(), sig.xy(), sig.zx()],
-              [sig.xy(), sig.yy(), sig.yz()],
-              [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=np.dot(self.Rotation,sigG)
-        #sigL=np.dot(R_sigG,self.TRotation)
-        #f+=[sigL[0][0]]
-        f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-            +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-        y0,z0=0.0,0.0
-        XY+=[[0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]
+        f=_stress_normal_to_crack(self.model,self.Rotation,center,ypnts,zpnts)
+        XY=[[y, z, y*y, y*z, z*z, 1.0] for y in ypnts for z in zpnts]
+        XY+=[[0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]   # the center of the ellipse
 
         # solve linear least squares problem (method of normal equations)
         XYTXY=np.dot(np.transpose(XY),XY)
@@ -3142,55 +3116,11 @@ class Hellipse(Damage):
 ######## Hellipse
     
     def __FitPolynomial(self,aa,bb,center):
-        ypnts = [-aa,0.0,aa]
-        zpnts = [0.0, bb/2.0, bb]
-        # initialize least square problem:
-        #           XY * coef = f
-        # XY is rectangular
-        f=[]
-        XY=[]
-        A = self.Rotation[0][0]
-        B = self.Rotation[0][1]
-        C = self.Rotation[0][2]
-
-        # get stress at each guass point
-        for y in ypnts:
-            for z in zpnts:
-                #u=np.dot(self.TRotation,[0,y,z])
-                #qpnt=center+Vec3D.Vec3D(u[0],u[1],u[2])
-                u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
-                u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
-                u2=self.Rotation[1][2]*y+self.Rotation[2][2]*z
-                qpnt=center+Vec3D.Vec3D(u0,u1,u2)
-##                print aa,y,bb,z
-##                print 'v',qpnt
-                sig=self.model.GetPtStress(qpnt)
-##                print 'out'
-                # GetPtStress returns a ColTensor, arrange to use Numeric the 
-                # global stress tensor is...
-                sigG=[[sig.xx(), sig.xy(), sig.zx()],
-                      [sig.xy(), sig.yy(), sig.yz()],
-                      [sig.zx(), sig.yz(), sig.zz()]]
-
-                # fill matrix and right-hand-side vector
-                #f+=[sigL[0][0]], in place of sigL = R*sigG*R'...
-                XY+=[[z, 1]]
-                f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-                    +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-
-        # add the center of ellipse...
-##        print center
-        sig=self.model.GetPtStress(center)
-        sigG=[[sig.xx(), sig.xy(), sig.zx()],
-              [sig.xy(), sig.yy(), sig.yz()],
-              [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=np.dot(self.Rotation,sigG)
-        #sigL=np.dot(R_sigG,self.TRotation)
-        #f+=[sigL[0][0]]
-        f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-            +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-
-        XY+=[[0.0, 1]]
+        ypnts=[-aa,0.0,aa]
+        zpnts=[0.0, bb/2.0, bb]
+        f=_stress_normal_to_crack(self.model,self.Rotation,center,ypnts,zpnts)
+        XY=[[z, 1] for y in ypnts for z in zpnts]
+        XY+=[[0.0, 1]]                         # the center of the ellipse
 
         # Solve the least squares problem
         XYTXY=np.dot(np.transpose(XY),XY)
@@ -3772,50 +3702,11 @@ class Qellipse(Damage):
     def __FitPolynomial(self,aa,bb,center): 
         ypnts=[0.0,aa/2.0,aa]
         zpnts=[0.0,bb/2.0,bb]
-        f=[]
-        XY=[]
-        A = self.Rotation[0][0]
-        B = self.Rotation[0][1]
-        C = self.Rotation[0][2]
-        # get stress at each guass point
-        for y in ypnts:
-            for z in zpnts:
-                #u=np.dot(self.TRotation,[0,y,z])
-                u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
-                u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
-                u2=self.Rotation[1][2]*y+self.Rotation[2][2]*z
-                #qpnt=center+Vec3D.Vec3D(u[0],u[1],u[2])
-                qpnt=center+Vec3D.Vec3D(u0,u1,u2)
-                sig=self.model.GetPtStress(qpnt)
-                # GetPtStress returns a ColTensor, arrange to use Numeric the 
-                # global stress tensor is...
-                sigG=[[sig.xx(), sig.xy(), sig.zx()],
-                      [sig.xy(), sig.yy(), sig.yz()],
-                      [sig.zx(), sig.yz(), sig.zz()]]
-                # sigL = R*sigG*R'
-                #R_sigG=np.dot(self.Rotation,sigG)
-                #sigL=np.dot(R_sigG,self.TRotation)
-
-                # fill matrix and right-hand-side vector
-                #f+=[sigL[0][0]]
-                XY+=[[z, 1]]
-                f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-                   +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-
-        # add the center of ellipse...
-        sig=self.model.GetPtStress(center)
-        sigG=[[sig.xx(), sig.xy(), sig.zx()],
-              [sig.xy(), sig.yy(), sig.yz()],
-              [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=np.dot(self.Rotation,sigG)
-        #sigL=np.dot(R_sigG,self.TRotation)
-        #f+=[sigL[0][0]]
-        f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
-            +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
-        XY+=[[0.0, 1]]
+        f=_stress_normal_to_crack(self.model,self.Rotation,center,ypnts,zpnts)
+        XY=[[z, 1] for y in ypnts for z in zpnts]
+        XY+=[[0.0, 1]]                         # the center of the ellipse
 
         # solve the linear least squares problem (method of normal equations)
-        XYTXY=0.; XYTf=0.
         XYTXY=np.dot(np.transpose(XY),XY)
         XYTf=np.dot(np.transpose(XY),f)
         coef=np.linalg.solve(XYTXY,XYTf)
