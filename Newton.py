@@ -4,8 +4,8 @@
 
 import sys
 import math
-import Numeric
-import LinearAlgebra
+import numpy as np
+
 
 # Exceptions:
 ##class NewtonExceptions(Exception):
@@ -16,29 +16,29 @@ import LinearAlgebra
 ##        NewtonSolve_ExceedMaxIts = "Newton.Solve() no convergence"
 
 def PrintResid(res):
-    for i in xrange(len(res)/3):
-        print " %d  %11.4g %11.4g %11.4g" % \
-             (i,res[i*3],res[i*3+1],res[i*3+2])
+    for i in range(len(res)//3):
+        print(" %d  %11.4g %11.4g %11.4g" % \
+             (i,res[i*3],res[i*3+1],res[i*3+2]))
 
 def DumpDisplacements(fem_data,disp):
 
     node_ids = fem_data.model.GetNodeIds()
-    print "Nodal Displacements:"
+    print("Nodal Displacements:")
     for node in node_ids:
         eqs = fem_data.eqn_nums[node]
-        print " %d  %22.15e %22.15e %22.15e" % \
-                (node,disp[eqs[0]],disp[eqs[1]],disp[eqs[2]])
+        print(" %d  %22.15e %22.15e %22.15e" % \
+                (node,disp[eqs[0]],disp[eqs[1]],disp[eqs[2]]))
         #print " %d  %11.4g %11.4g %11.4g" % \
         #        (node,disp[eqs[0]],disp[eqs[1]],disp[eqs[2]])
 
 def DumpResidual(fem_data,res):
 
     node_ids = fem_data.model.GetNodeIds()
-    print "Nodal Residuals:"
+    print("Nodal Residuals:")
     for node in node_ids:
         eqs = fem_data.eqn_nums[node]
-        print " %d  %22.15e %22.15e %22.15e" % \
-                (node,res[eqs[0]],res[eqs[1]],res[eqs[2]])
+        print(" %d  %22.15e %22.15e %22.15e" % \
+                (node,res[eqs[0]],res[eqs[1]],res[eqs[2]]))
 
 def Solve(num_eqns,X,tol,EvalFunc,TangFunc,cdata,maximum_iterations=None):
 
@@ -50,10 +50,10 @@ def Solve(num_eqns,X,tol,EvalFunc,TangFunc,cdata,maximum_iterations=None):
     else: MAX_ITER = 100
 
     # get memory for the solve
-    del_X_itr = Numeric.zeros((num_eqns),Numeric.Float64)
-    del_X_cum = Numeric.zeros((num_eqns),Numeric.Float64)
-    func_val = Numeric.zeros((num_eqns),Numeric.Float64)
-    jacobian = Numeric.zeros((num_eqns,num_eqns),Numeric.Float64)
+    del_X_itr = np.zeros((num_eqns),np.float64)
+    del_X_cum = np.zeros((num_eqns),np.float64)
+    func_val = np.zeros((num_eqns),np.float64)
+    jacobian = np.zeros((num_eqns,num_eqns),np.float64)
 
     # evaluate the nonlinear function and compute the function norm
     EvalFunc(cdata,del_X_cum,X,func_val) # only change is in func_val.
@@ -62,7 +62,7 @@ def Solve(num_eqns,X,tol,EvalFunc,TangFunc,cdata,maximum_iterations=None):
 
     # if initial guess is right on, return it and be done!  
     norm = 0.0
-    for i in xrange(num_eqns):
+    for i in range(num_eqns):
         norm += func_val[i]**2
     norm = math.sqrt(norm)
     if norm <= tol: return X
@@ -84,7 +84,7 @@ def Solve(num_eqns,X,tol,EvalFunc,TangFunc,cdata,maximum_iterations=None):
         #    print i,jacobian[i,i]
 
         # dx
-        del_X_iter = LinearAlgebra.solve_linear_equations(jacobian,func_val)
+        del_X_iter = np.linalg.solve(jacobian,func_val)
         del_X_cum -= del_X_iter # minus because Dx = - F(x)/F'(x)
 ##        print "del_X_iter:", del_X_iter
 
@@ -98,7 +98,7 @@ def Solve(num_eqns,X,tol,EvalFunc,TangFunc,cdata,maximum_iterations=None):
 
         # Calc. norm
         norm = 0.0
-        for i in xrange(num_eqns):
+        for i in range(num_eqns):
             norm += func_val[i]**2
         norm = math.sqrt(norm)
 
@@ -143,8 +143,8 @@ if __name__ == '__main__':
                  N[1]*self.__coords[1][1] + \
                  N[2]*self.__coords[2][1] + \
                  N[3]*self.__coords[3][1]
-            func_val[0] = self.__x - xt
-            func_val[1] = self.__y - yt
+            func_val[0] = xt - self.__x
+            func_val[1] = yt - self.__y
 ##            print u[0],u[1],func_val[0],func_val[1]
 
 
@@ -194,5 +194,5 @@ if __name__ == '__main__':
 
     delta = Solve(2,(0.5,0.5),tol,im.EvalFunc,im.TangFunc,None)
 
-    print delta
+    print(delta)
 

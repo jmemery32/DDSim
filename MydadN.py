@@ -1,7 +1,10 @@
 import math
-import Numeric
+import numpy as np
 
-import dadN as PYDdadN
+try:  # compiled 2007 version; only used by the comparison harness at the bottom
+    import dadN as PYDdadN
+except ImportError:
+    PYDdadN = None
 
 import Newton # for Willenborg()
 
@@ -231,26 +234,26 @@ class dadN:
 ######### dadN
 
     def PrintMaterialModel(self):
-        print ' UTS = ', self.UTS
-        print ' YS = ', self.YS
-        print ' Kie = ', self.Kie
-        print ' Kic = ', self.Kic
-        print ' Ak = ', self.Ak
-        print ' Bk = ', self.Bk
-        print ' C = ', self.C
-        print ' n = ', self.n
-        print " n' = ", self.np
-        print ' p = ', self.p
-        print ' q = ', self.q
-        print ' DK1 = ', self.DK1
-        print ' Cthp = ', self.Cthp
-        print ' Cthm = ', self.Cthm
-        print ' Rcl = ', self.Rcl
-        print ' alpha = ', self.alfa
-        print ' Smax/SIGo = ', self.ratio
-        print ' R = ', self.R
-        print ' a0 = ', self.a0
-        print ' Is Surface = ', self.surf
+        print(' UTS = ', self.UTS)
+        print(' YS = ', self.YS)
+        print(' Kie = ', self.Kie)
+        print(' Kic = ', self.Kic)
+        print(' Ak = ', self.Ak)
+        print(' Bk = ', self.Bk)
+        print(' C = ', self.C)
+        print(' n = ', self.n)
+        print(" n' = ", self.np)
+        print(' p = ', self.p)
+        print(' q = ', self.q)
+        print(' DK1 = ', self.DK1)
+        print(' Cthp = ', self.Cthp)
+        print(' Cthm = ', self.Cthm)
+        print(' Rcl = ', self.Rcl)
+        print(' alpha = ', self.alfa)
+        print(' Smax/SIGo = ', self.ratio)
+        print(' R = ', self.R)
+        print(' a0 = ', self.a0)
+        print(' Is Surface = ', self.surf)
 
 ######### dadN
 
@@ -336,7 +339,7 @@ class dadN:
             m = L + (R - L)/2.0
             FL = (Fprime(L,DKth,Kmax,Reff) / self.__NASGRO(L,Reff,DKth,Kmax))*L
             Fm = (Fprime(m,DKth,Kmax,Reff) / self.__NASGRO(m,Reff,DKth,Kmax))*m
-            if Numeric.sign(FL-self.np) == Numeric.sign(Fm-self.np):
+            if np.sign(FL-self.np) == np.sign(Fm-self.np):
                 L = m
             else:
                 R = m
@@ -465,7 +468,7 @@ class Willenborg(dadN):
 
         # if not,  compute some parameter for more logic
         da=a - self.aol
-        if da < 0.0: raise "dadN.Willenborg() delta_a is negative."
+        if da < 0.0: raise ValueError("dadN.Willenborg() delta_a is negative.")
         elif da > self.zo:
             self.Kol = Kmax
             self.zo = (math.pi/8)*((Kmax/(self.alphag*self.YS))**2.0)
@@ -631,16 +634,16 @@ def FiniteDiff(material):
     # to help debug Willenborg()...
     inc=0.1
 
-    for i in xrange(6): 
+    for i in range(6): 
         R = 0.0
         DKth2=fatigue1.Calc_DKth(a,R+inc)
         DKth1=fatigue1.Calc_DKth(a,R)
         deriv = fatigue1.dDKthbydReff(a,R)
         findiff = (DKth2-DKth1)/inc
         err = 100*((deriv-findiff)/deriv)
-        print "inc =", inc
-        print "R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
-              (R,deriv,findiff,err)
+        print("inc =", inc)
+        print("R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
+              (R,deriv,findiff,err))
 
         R = -0.11718140 
         DKth2=fatigue1.Calc_DKth(a,R+inc)
@@ -648,8 +651,8 @@ def FiniteDiff(material):
         deriv = (fatigue1.dDKthbydReff(a,R))
         findiff = ((DKth2-DKth1)/inc)
         err = 100*((deriv-findiff)/deriv)
-        print "R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
-              (R,deriv,findiff,err)
+        print("R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
+              (R,deriv,findiff,err))
 
 
         R = 0.4
@@ -658,11 +661,11 @@ def FiniteDiff(material):
         deriv = fatigue1.dDKthbydReff(a,R)
         findiff = (DKth2-DKth1)/inc
         err = 100*((deriv-findiff)/deriv)
-        print "R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
-              (R,deriv,findiff,err)
+        print("R: %1.1f analytical = %f, finite diff = %f, %% error = %f" % \
+              (R,deriv,findiff,err))
 
 
-        print "\n"
+        print("\n")
         inc=inc/1000.0
 
 ####### end Willenborg
@@ -698,14 +701,14 @@ if __name__== '__main__':
 
     for i in range(len(DK)):
 
-        print " no retardation:"
-        print fat1.Calc_dadN(DK[i],a,int(N),R[i]), \
-              fat2.Calc_dadN(DK[i],a,int(N),R[i])
-        print "**"
-        print " Willenborg retardation:"
-        print fat1.Willenborg(DK[i],a,int(N),R[i]), \
-              fat2.Compute_dadN(DK[i],a,int(N),R[i])
-        print "** ** ** ** \n"
+        print(" no retardation:")
+        print(fat1.Calc_dadN(DK[i],a,int(N),R[i]), \
+              fat2.Calc_dadN(DK[i],a,int(N),R[i]))
+        print("**")
+        print(" Willenborg retardation:")
+        print(fat1.Willenborg(DK[i],a,int(N),R[i]), \
+              fat2.Compute_dadN(DK[i],a,int(N),R[i]))
+        print("** ** ** ** \n")
 
         N+=1
         a+=fat2.Compute_dadN(DK[i],a,int(N),R[i])

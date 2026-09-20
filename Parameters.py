@@ -1,4 +1,4 @@
-import sys, string
+import sys
 
 class Parameters:
     '''
@@ -69,43 +69,43 @@ class Parameters:
         file = open(self.path+self.filename+'.par','r')
         buff = self.__GetLine(file)
         while buff != None:
-            vals = string.splitfields(buff)
+            vals = str.split(buff)
             if vals[0] == 'a_b':
                 self.a_b =[]
-                vals = string.splitfields(self.__GetLine(file))
-                for ii in range(len(vals)/2): self.a_b +=[[float(vals[ii*2]), \
+                vals = str.split(self.__GetLine(file))
+                for ii in range(len(vals)//2): self.a_b +=[[float(vals[ii*2]), \
                                                         float(vals[ii*2+1])]]
             elif vals[0] == 'material':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 for val in vals:
                     self.material += [float(val)]
             elif vals[0] == 'dN':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.dN = float(vals[0])
             elif vals[0] == 'max_error':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.max_error = float(vals[0])
             elif vals[0] == 'N_max':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.N_max = float(vals[0])
             elif vals[0] == 'min_inc':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.min_inc = float(vals[0])
             elif vals[0] == 'samples':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.samples = int(vals[0])
             elif vals[0] == 'sets':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.sets = int(vals[0])
             elif vals[0] == 'monte':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.monte = int(vals[0])
             elif vals[0] == 'ratio':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.r = float(vals[0])
                 if self.r < 1.0: self.r = 1.1
             elif vals[0] == 'MaxCrack':
-                vals = string.splitfields(self.__GetLine(file))
+                vals = str.split(self.__GetLine(file))
                 self.Max_crack_size = float(vals[0])
 
             buff = self.__GetLine(file)

@@ -1,4 +1,4 @@
-import sys, string
+import sys
 
 class Spectrum:
     '''
@@ -13,9 +13,8 @@ class Spectrum:
         vals = inf.readlines()
         inf.close()
         for val in vals:
-            fff=string.splitfields(val)
-            fff.sort()
-            self.load+=[(float(fff[0]),float(fff[1]))]
+            fff=sorted(float(v) for v in val.split()) # numeric sort: (min,max)
+            self.load+=[(fff[0],fff[1])]
 
         self.length=len(self.load)
 
@@ -107,13 +106,13 @@ if __name__=="__main__":
         dk+=[dk1]
         R+=[R1]
 
-    print spec.load[0:15]
-    print dk[0:15]
-    print R[0:15]
-    print ' '
-    print spec.load[4950:]
-    print dk[4950:4957]
-    print R[4950:4957]
+    print(spec.load[0:15])
+    print(dk[0:15])
+    print(R[0:15])
+    print(' ')
+    print(spec.load[4950:])
+    print(dk[4950:4957])
+    print(R[4950:4957])
 
 
 

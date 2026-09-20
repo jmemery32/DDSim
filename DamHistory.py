@@ -41,7 +41,7 @@ if __name__=="__main__":
         a.K+=[a.K[i]+0.1]
 ##        a[1]+=[a.K[i]+0.1]
 
-    print a
+    print(a)
 ##    print a['c'][0]
 ##    print a[0][0]
 ##    print a[1][0]

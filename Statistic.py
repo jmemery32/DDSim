@@ -1,11 +1,11 @@
-import numpy as Numeric
-import sys, cPickle
+import numpy as np
+import sys, pickle
 
 def CalcSampMean(set,values):
     '''
     To calculate the sample mean of r.v., self.SampMean.append.
     '''
-    mean = Numeric.cumsum(values)[-1]/len(values)
+    mean = np.cumsum(values)[-1]/len(values)
     return mean
 
 def CalcSampVar(set,values,sampmean):
@@ -42,61 +42,61 @@ def TestStata():
     stat = Stata(2,5)
     list1 = [1.2, 3.0, 3.1, 3.4, 5.4]
     list2 = [1253.4, 1485.1, 6984.2, 4512.2, 7845.3]
-    print ' list 1 = ', list1
-    print ' mean = 3.22  variance = 2.232'
-    print ' list 2 = ', list2
-    print ' mean = 4416.04  variance = 9239304.43'
+    print(' list 1 = ', list1)
+    print(' mean = 3.22  variance = 2.232')
+    print(' list 2 = ', list2)
+    print(' mean = 4416.04  variance = 9239304.43')
 
     stat.UpdateSet()
     for i in list1: stat.UpdateSamples(i,0)
     stat.UpdateSet()
     for j in list2: stat.UpdateSamples(j,1)
 
-    print ' '
-    print ' As stored...'
-    print ' list 1 = ', stat.sample(0)
-    print ' list 2 = ', stat.sample(1)
-    print ' or     = ', stat
+    print(' ')
+    print(' As stored...')
+    print(' list 1 = ', stat.sample(0))
+    print(' list 2 = ', stat.sample(1))
+    print(' or     = ', stat)
 
-    print ' '
-    print ' Statistics...'
-    print ' Sample Mean and Variance of list 1 = ', \
-          stat.SampleMean(0), stat.SampleVariance(0)
-    print ' Sample Mean and Variance of list 2 = ', \
-          stat.SampleMean(1), stat.SampleVariance(1)
+    print(' ')
+    print(' Statistics...')
+    print(' Sample Mean and Variance of list 1 = ', \
+          stat.SampleMean(0), stat.SampleVariance(0))
+    print(' Sample Mean and Variance of list 2 = ', \
+          stat.SampleMean(1), stat.SampleVariance(1))
 
-    print ' P(X <= 3.2) =', stat.CalcProb(0,3.2)
-    print ' P(X <= 3000) =', stat.CalcProb(1,3000.)
+    print(' P(X <= 3.2) =', stat.CalcProb(0,3.2))
+    print(' P(X <= 3000) =', stat.CalcProb(1,3000.))
 
 def TestStatN():
     stat = StatN(2,5)
     list1 = [1.2, 3.0, 3.1, 3.4, 5.4]
     list2 = [1253.4, 1485.1, 6984.2, 4512.2, 7845.3]
-    print ' list 1 = ', list1
-    print ' mean = 3.22  variance = 2.232'
-    print ' list 2 = ', list2
-    print ' mean = 4416.04  variance = 9239304.43'
+    print(' list 1 = ', list1)
+    print(' mean = 3.22  variance = 2.232')
+    print(' list 2 = ', list2)
+    print(' mean = 4416.04  variance = 9239304.43')
 
     stat.UpdateSet()
     for i in range(len(list1)): stat.UpdateSamples(list1[i],0,i)
     stat.UpdateSet()
     for j in range(len(list2)): stat.UpdateSamples(list2[j],1,i+j+1)
 
-    print ' '
-    print ' As stored...'
-    print ' list 1 = ', stat.sample(0)
-    print ' list 2 = ', stat.sample(1)
-    print ' or     = ', stat
+    print(' ')
+    print(' As stored...')
+    print(' list 1 = ', stat.sample(0))
+    print(' list 2 = ', stat.sample(1))
+    print(' or     = ', stat)
 
-    print ' '
-    print ' Statistics...'
-    print ' Sample Mean and Variance of list 1 = ', \
-          stat.SampleMean(0), stat.SampleVariance(0)
-    print ' Sample Mean and Variance of list 2 = ', \
-          stat.SampleMean(1), stat.SampleVariance(1)
+    print(' ')
+    print(' Statistics...')
+    print(' Sample Mean and Variance of list 1 = ', \
+          stat.SampleMean(0), stat.SampleVariance(0))
+    print(' Sample Mean and Variance of list 2 = ', \
+          stat.SampleMean(1), stat.SampleVariance(1))
 
-    print ' P(X <= 3.2) =', stat.CalcProb(0,3.2)
-    print ' P(X <= 3000) =', stat.CalcProb(1,3000.)
+    print(' P(X <= 3.2) =', stat.CalcProb(0,3.2))
+    print(' P(X <= 3000) =', stat.CalcProb(1,3000.))
 
 class Stata:
     '''
@@ -125,7 +125,7 @@ class Stata:
         for diction in self.rv:
             s+="Set %s" % (setid)
             s+="\n"
-            iters=diction.keys()
+            iters=list(diction.keys())
             iters.sort()
             for ai in iters:
                 for rid in diction[ai]:
@@ -141,7 +141,7 @@ class Stata:
     def UpdateSamples(self,a,set,RID=None): # run UpdateSet first
         if RID:
             self.rid_ai[RID]=[set,a]
-            if self.rv[set].has_key(a):
+            if a in self.rv[set]:
                 self.rv[set][a]+=[RID]
             else: 
                 self.rv[set][a]=[RID]
@@ -163,21 +163,21 @@ class Stata:
 ################ class Stata
 
     def SampleMean(self,set):
-        if self.SampMean.has_key(set):
+        if set in self.SampMean:
             return self.SampMean[set]
         else:
-            mean = CalcSampMean(set,self.rv[set].keys())
+            mean = CalcSampMean(set,list(self.rv[set].keys()))
             self.SampMean[set]=mean
             return mean
 
 ################ class Stata
 
     def SampleVariance(self,set):
-        if self.SampVar.has_key(set):
+        if set in self.SampVar:
             return self.SampVar[set]
         else:
             sampmean=self.SampleMean(set)
-            var=CalcSampVar(set,self.rv[set].keys(),sampmean)
+            var=CalcSampVar(set,list(self.rv[set].keys()),sampmean)
             self.SampVar[set]=var
             return var
 
@@ -188,7 +188,7 @@ class Stata:
         To cacluate the probability P(X<=x). I.e., number of samples in rv that
         are less than or equal to x divided by the total number of samples.
         '''
-        return CalcProb(set,x,self.rv[set].keys())
+        return CalcProb(set,x,list(self.rv[set].keys()))
 
 ################ class Stata
 
@@ -197,7 +197,7 @@ class Stata:
         loop through the sets and return the first value for a given ai
         '''
         for set in self.rv:
-            if set.has_key(ai):
+            if ai in set:
                 return set[ai]
 
         return -12
@@ -233,7 +233,7 @@ class StatN:
         for set in self.rv:
             s+="Set %s" % (setid)
             s+="\n"
-            iters=set.values()
+            iters=list(set.values())
             iters.sort()
             for ai in iters:
                 s+="%1.4e ," %(ai)
@@ -248,7 +248,7 @@ class StatN:
     def UpdateSamples(self,N,set,RID): # run UpdateSet first
         if type(RID)==type([]):
             for rid in RID:
-                if self.rv[set].has_key(rid): continue
+                if rid in self.rv[set]: continue
                 else: self.rv[set][rid]=N
         else: # RID is not a list (like from twins)
             self.rv[set][RID]=N
@@ -268,21 +268,21 @@ class StatN:
 ################ class StatN
 
     def SampleMean(self,set):
-        if self.SampMean.has_key(set):
+        if set in self.SampMean:
             return self.SampMean[set]
         else:
-            mean = CalcSampMean(set,self.rv[set].values())
+            mean = CalcSampMean(set,list(self.rv[set].values()))
             self.SampMean[set]=mean
             return mean
 
 ################ class StatN
 
     def SampleVariance(self,set):
-        if self.SampVar.has_key(set):
+        if set in self.SampVar:
             return self.SampVar[set]
         else:
             sampmean=self.SampleMean(set)
-            var=CalcSampVar(set,self.rv[set].values(),sampmean)
+            var=CalcSampVar(set,list(self.rv[set].values()),sampmean)
             self.SampVar[set]=var
             return var
 
@@ -293,7 +293,7 @@ class StatN:
         To cacluate the probability P(X<=x). I.e., number of samples in rv that
         are less than or equal to x divided by the total number of samples.
         '''
-        return CalcProb(set,x,self.rv[set].values())
+        return CalcProb(set,x,list(self.rv[set].values()))
 
 ################ end class StatN
 
