@@ -40,7 +40,7 @@ adaptive **step-size control**, not the RK5 solution itself.
 | `ColTensor.pyd` | `ColTensor.py` (`PrincipalValues` sorted descending, like the Jacobi routine) | done, tested |
 | `JohnsVectorTools.pyd` | `JohnsVectorTools.py` (source never recovered; inferred from call sites) | done, tested |
 | `MeshTools.pyd` (`MeshTools.MeshTools(name,'RDB')`) | `MeshTools.py` (queries) + `elements.py` (6 solid + 4 surface element types) + `mesh_io.py` (`MeshData`, RDB reader; Exodus will produce the same `MeshData`) | done, tested |
-| `GeomUtils.pyd` (`BuildSurfMeshCObject`, `EllipseCMeshIntersections`, `EllipseArcLength`) | scipy/numpy port of `GeomUtils.cpp` | **todo** |
+| `GeomUtils.pyd` (`BuildSurfMeshCObject`, `EllipseCMeshIntersections`, `EllipseArcLength`) | `GeomUtils.py` (closed-form ellipse/plane crossings, triangulated surface mesh) | done, tested |
 
 Other things the compiled `dadN.pyd` did differently from `MydadN.py`, now aligned:
 `Willenborg` substituted the material R only when the R passed in was `> 100`
@@ -69,3 +69,27 @@ Other things the compiled `dadN.pyd` did differently from `MydadN.py`, now align
   `GeomUtils/`, ... next to the new `MeshTools.py`/`GeomUtils.py` modules. Python
   prefers the `.py` file over a directory without `__init__.py`, so imports work,
   but consider moving the C++ reference sources to e.g. `legacy/cpp/`.
+
+## Geometry layer (`GeomUtils.py`): differences from `GeomUtils.cpp`
+
+* **Ellipse/plane crossing is closed form.** The C++ bracketed with three sample
+  angles and bisected 8-14 times; it could miss thin intersections and had a
+  copy-paste slip (`abs(D3) > abs(D1)` twice). Tested against dense sampling.
+* **`EllipseArcLength` step size.** The 2007 default (9-point Gauss over pi/2
+  steps) is off by ~0.13% for a 3:1 ellipse, more for slender ones. The step now
+  scales with the aspect ratio (<1e-8 relative error up to 20:1). The integrand
+  is the 2007 one. **This changes arc lengths slightly vs. 2007 results.**
+* **Shared-edge crossings are reported once** (the C++ could double-count, then
+  let its tangency filter delete both, or drop the real crossing).
+* **The tangency/sliver filter is kept** (crossings closer than 10% of the
+  perimeter along the ellipse, or wrapping >90%, are treated as a tangent touch
+  and dropped, with the same "(0,1) pair => drop both, else drop first"
+  rule) but its bookkeeping is now aligned; the C++ indexed `ThCross` after
+  entries had been removed from `ThList`. **Heads-up:** in random tests ~45% of
+  ellipses that poke through a surface have some crossings dropped by this
+  heuristic -- it is a modelling choice of the original code, worth revisiting.
+* `PointInFacet` decides on-edge points explicitly (the angle-sum test can cancel
+  from rounding noise there); `DistanceToLineSeg` was not ported (its middle
+  branch returned an uninitialised value in the C++).
+* Debug `cout` output of the C++ (it printed every crossing) is gone.
+* `IsPointIn` at `DamClass.py:3871` -- still to be checked.
