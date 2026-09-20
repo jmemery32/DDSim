@@ -39,9 +39,33 @@ adaptive **step-size control**, not the RK5 solution itself.
 | `Vec3D.pyd` | `Vec3D.py` (semantics copied from `Vec3DModule.cpp`: `v*v` is dot, `Normalize` returns a new vector) | done, tested |
 | `ColTensor.pyd` | `ColTensor.py` (`PrincipalValues` sorted descending, like the Jacobi routine) | done, tested |
 | `JohnsVectorTools.pyd` | `JohnsVectorTools.py` (source never recovered; inferred from call sites) | done, tested |
-| `MeshTools.pyd` (`MeshTools.MeshTools(name,'RDB')`) | Python `Model` class + RDB reader (format documented in `MeshTools.cpp::ReadRelationalDBFiles`) | **todo** |
+| `MeshTools.pyd` (`MeshTools.MeshTools(name,'RDB')`) | `MeshTools.py` (queries) + `elements.py` (6 solid + 4 surface element types) + `mesh_io.py` (`MeshData`, RDB reader; Exodus will produce the same `MeshData`) | done, tested |
 | `GeomUtils.pyd` (`BuildSurfMeshCObject`, `EllipseCMeshIntersections`, `EllipseArcLength`) | scipy/numpy port of `GeomUtils.cpp` | **todo** |
 
 Other things the compiled `dadN.pyd` did differently from `MydadN.py`, now aligned:
 `Willenborg` substituted the material R only when the R passed in was `> 100`
 (the Python version replaced any falsy R, including a legitimate `0.0`).
+
+## Mesh layer: deliberate differences from `MeshTools.cpp`
+
+* **Surface normals are oriented outward** using the parent element. In the
+  2007 face tables the `WEDGE_6` normals point *inward* for a right-handed
+  element (the other five types point outward). `DamClass` documents its
+  normals as outward.
+* **`NearestPoint` fixed for simplex elements** (`TET_4`, `TET_10`, `WEDGE_6`,
+  `WEDGE_15`). The C++ moved the coordinates by `-u/3` with `u < 0` (wrong
+  direction) and the 10-node tet mixed up `r` and `s`. Only affects the
+  reported distance / element choice for points that are just outside the mesh
+  (status `-1`).
+* **Shape-function derivatives** come from complex-step differentiation of the
+  shape functions instead of hand-typed tables (exact for polynomials).
+* **Range tree -> uniform grid** over the (10%-padded) element bounding boxes.
+* Not ported (unused by DDSim Level I): `GetPtDisp` (displacements were a
+  hard-wired zero), `GetAdjacentSurfEdgeLengths`, `PlotSurfaceMesh`, pyramid
+  elements (the C++ asserted on them in `BuildSurfaceMesh` anyway).
+* `DamClass.py` (Qellipse, ~line 3871) calls `model.IsPointIn(...)`, which is not
+  in the compiled module's method table -- probably dead code; to be checked.
+* The repo root still contains the untracked reference directories `MeshTools/`,
+  `GeomUtils/`, ... next to the new `MeshTools.py`/`GeomUtils.py` modules. Python
+  prefers the `.py` file over a directory without `__init__.py`, so imports work,
+  but consider moving the C++ reference sources to e.g. `legacy/cpp/`.
