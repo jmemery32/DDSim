@@ -1,4 +1,4 @@
-import cPickle, os, sys, string, Statistic
+import pickle, os, sys, Statistic
 
 def Ansys2Sig(ansysfile,sigfile,confile):
     '''
@@ -29,7 +29,7 @@ def Ansys2Sig(ansysfile,sigfile,confile):
     # midside nodes
     conlines=confile.readlines()
     for sline in conlines:
-        line=string.splitfields(sline)
+        line=sline.split()
         midsideid=int(line[0])
         aid=int(line[3])
         bid=int(line[4])
@@ -57,7 +57,7 @@ def CutMAPFile(oldMAPFile,newMAPFile,setid,high,low):
     junk=oldMAPFile.readline()
     myfile = oldMAPFile.readlines()
     for line in myfile:
-        x=string.splitfields(line)
+        x=line.split()
         id=int(x[0])
         value=float(x[1])
         if value > high:
@@ -72,7 +72,7 @@ def MakeDamOro(Nfile,buff,doid,setid):
     DamOro.UpdateSet()
 
     while buff:
-        line=string.split(buff)
+        line=buff.split()
         newdoid=int(line[0])
         if newdoid==doid: DamOro.UpdateSamples(float(line[2]),0,int(line[1]))
         else: break
@@ -90,14 +90,14 @@ def ToMAPFile(DamOro,MAPFile,set,HighLife):
     set  - the set from which to write mean value for
     '''
 
-    DamKeys = DamOro.keys()
+    DamKeys = list(DamOro.keys())
     DamKeys.sort()
 
     MAPFile.write('LIFE 0'+"\n")
     for i in DamKeys: # i = doid
         if DamOro[i].SampleMean(set) == -1.0:
             MAPFile.write(str(i)+' '+str(HighLife)+"\n")
-        elif len(DamOro[i].rv[set])==1 and DamOro[i].rv[set].has_key(-1):
+        elif len(DamOro[i].rv[set])==1 and -1 in DamOro[i].rv[set]:
             MAPFile.write(str(i)+' '+str(HighLife)+"\n")
         else:
             MAPFile.write(str(i)+' '+str(DamOro[i].SampleMean(set))+"\n")
@@ -127,20 +127,20 @@ def JoinPickles(newfile,num):
     '''
 
     mydict={}
-    for i in xrange(num):
+    for i in range(num):
         fn = open(filename+'.'+str(i),'r+b')
-        addtodict = cPickle.load(fn)
+        addtodict = pickle.load(fn)
         fn.close()
         mydict.update(addtodict)
 
-    cPickle.dump(mydict,newfile,2)
+    pickle.dump(mydict,newfile,2)
 
 def JoinASCII(f_joined,num):
     '''
     Function to join ASCII output files
     '''
 
-    for i in xrange(num):
+    for i in range(num):
         f1 = open(filename+'.'+str(i),'r')
         myfile = f1.readlines()
         f1.close()
@@ -154,38 +154,38 @@ def JoinGerdASCII(f_joined,num):
     '''
 
     f_joined.write('Stress 2'+"\n")
-    for i in xrange(num):
+    for i in range(num):
         f1 = open(filename+'.'+str(i),'r')
         myfile = f1.readlines()
         f1.close()
         for line in myfile:
-            x=string.splitfields(line)
+            x=line.split()
 ##            x.pop(0)
 ##            x.pop(0)
-            line=string.join(x)
+            line=" ".join(x)
             f_joined.write(line+"\n")
 
 def PrintHelps():
-    print ' '
-    print ' -file <file.name>'
-    print ' -num <number of processors>'
-    print ' -map <integer> provied MAP contour file for given file (above) and'
-    print "      set.  Actually creates from pickled N's. "
-    print ' -P or -p if they are pickled files'
-    print ' -A or -a if they are ASCII files'
-    print " -G or -g if they are ASCII files in Gerd's new nodal stress format"
-    print " -c or -C to cut chop values in a *.tab.0 file followed by:"
-    print " -setid <integer> set i.d. (for cutoff map file)"
-    print " -high <number> is the upper value to cut contours off at"
-    print " -low <number> is the lower value to cut contours off at"
-    print " -ansys to convert and ansys stress output file to *.sig (readable "
-    print "        by Meshtools.pyd).  Specify ansys file with -file (above) "
-    print "        but do NOT include file extension!!!!! name of ansys file"
-    print "        should be filename.str, must have filename.con in same "
-    print "        working directory and will get filename.sig."
-    print " -report <BaseFileName> - use to report performance information.  "
-    print "          Assumes already cat'd BaseFileName.stn.$MSTI_RANK$ files."
-    print ' '
+    print(' ')
+    print(' -file <file.name>')
+    print(' -num <number of processors>')
+    print(' -map <integer> provied MAP contour file for given file (above) and')
+    print("      set.  Actually creates from pickled N's. ")
+    print(' -P or -p if they are pickled files')
+    print(' -A or -a if they are ASCII files')
+    print(" -G or -g if they are ASCII files in Gerd's new nodal stress format")
+    print(" -c or -C to cut chop values in a *.tab.0 file followed by:")
+    print(" -setid <integer> set i.d. (for cutoff map file)")
+    print(" -high <number> is the upper value to cut contours off at")
+    print(" -low <number> is the lower value to cut contours off at")
+    print(" -ansys to convert and ansys stress output file to *.sig (readable ")
+    print("        by Meshtools.pyd).  Specify ansys file with -file (above) ")
+    print("        but do NOT include file extension!!!!! name of ansys file")
+    print("        should be filename.str, must have filename.con in same ")
+    print("        working directory and will get filename.sig.")
+    print(" -report <BaseFileName> - use to report performance information.  ")
+    print("          Assumes already cat'd BaseFileName.stn.$MSTI_RANK$ files.")
+    print(' ')
 
 def ReadNFile(Nfile):
     '''
@@ -204,11 +204,11 @@ def ReadNFile(Nfile):
 
     DamOro={}
     for line in LinesInNfile:
-        sortedline=string.split(line)
+        sortedline=line.split()
         doid=int(sortedline[0])
         rid=int(sortedline[1])
         N=float(sortedline[2])
-        if DamOro.has_key(doid): DamOro[doid].UpdateSamples(N,0,rid)
+        if doid in DamOro: DamOro[doid].UpdateSamples(N,0,rid)
         else:
             DamOro[doid]=Statistic.StatN(1,'dynamic')
             DamOro[doid].UpdateSet()
@@ -218,16 +218,16 @@ def ReadNFile(Nfile):
 
 def Report(report):
     Nfile=open(report+".stn",'r+b')
-    DamOro=cPickle.load(Nfile)
+    DamOro=pickle.load(Nfile)
     Nfile.close()
     HighLife=0.0
-    print ' **Assuming there is at least one node that processed to N_max.'
+    print(' **Assuming there is at least one node that processed to N_max.')
     for i in DamOro:
         try:
             if DamOro[i].SampleMean(setid) > HighLife: 
                 HighLife = DamOro[i].SampleMean(setid)
         except IndexError:
-            print i
+            print(i)
             continue
 
     NumNodes=len(DamOro)
@@ -236,7 +236,7 @@ def Report(report):
     TotalKs=0
     for node in DamOro:
         for set in DamOro[node].rv:
-            for N in set.values():
+            for N in list(set.values()):
                 if N == HighLife: TotalKs+=1
                 else: TotalKs+=N
 
@@ -247,8 +247,8 @@ def Report(report):
         t=float(time)
         if t>Time: Time=t
 
-    print 'Num nodes, Num Sets, Num Samples, Total Ks computed'
-    print NumNodes, NumSets, NumSamples, TotalKs, Time
+    print('Num nodes, Num Sets, Num Samples, Total Ks computed')
+    print(NumNodes, NumSets, NumSamples, TotalKs, Time)
 
 if __name__ == "__main__":
     '''
@@ -343,12 +343,12 @@ if __name__ == "__main__":
     if map: 
         Nfile=open(filename,'r')
         MAPFile=open(filename+'.'+str(setid)+'.tab.0','w')
-        print ' **Assuming there is at least one node that processed to N_max.'
+        print(' **Assuming there is at least one node that processed to N_max.')
         HighLife=0.0
         buff=Nfile.readline()
 
         while buff:
-            line=string.split(buff)
+            line=buff.split()
             doid=int(line[0])
             DamOro,buff=MakeDamOro(Nfile,buff,doid,setid)
 
@@ -357,7 +357,7 @@ if __name__ == "__main__":
 
             if DamOro.SampleMean(setid) == -1.0:
                 MAPFile.write(str(doid)+' HighLife'+"\n")
-            elif len(DamOro.rv[setid])==1 and DamOro.rv[setid].has_key(-1):
+            elif len(DamOro.rv[setid])==1 and -1 in DamOro.rv[setid]:
                 MAPFile.write(str(doid)+' HighLife'+"\n")
             else:
                 MAPFile.write(str(doid)+' '+str(DamOro.SampleMean(setid))+"\n")
@@ -370,14 +370,14 @@ if __name__ == "__main__":
         s={}
         buff=MAPFile.readline()
         while buff:
-            line=string.split(buff)
+            line=buff.split()
             s[int(line[0])]=line[1]
             buff = MAPFile.readline()
         MAPFile.close()
 
         MAPFile=open(filename+'.'+str(setid)+'.tab.0','w')
         MAPFile.write("Life 0 \n")
-        nodes=s.keys()
+        nodes=list(s.keys())
         nodes.sort()
         for node in nodes:
             if s[node]=="HighLife": MAPFile.write(str(node)+' '+str(HighLife)+"\n")
@@ -414,7 +414,7 @@ if __name__ == "__main__":
 
     if nfile:
         Nfile=open(filename,'r+b')
-        DamOro=cPickle.load(Nfile)
+        DamOro=pickle.load(Nfile)
         Nfile.close()
         MAPFile=open(filename+'.'+str(setid)+'.Pf.tab.0','w')
         ProbFail(DamOro,MAPFile,setid,ncr)

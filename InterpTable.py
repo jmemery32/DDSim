@@ -30,7 +30,7 @@ class InterpTable:
         lc=len(self.ColVals)
         for i in range(len(new_rowvals)):
             self.AppendRowAndInsert(new_rowvals[i],\
-                        new_fxy[i*lc:(i+1)*lc]
+                        new_fxy[i*lc:(i+1)*lc])
 
 # ######################################################
 
@@ -40,7 +40,7 @@ class InterpTable:
         new_fxy = list, len(new_fxy) == len(self.ColVals)
         '''
         assert(len(new_fxy) == len(self.ColVals))
-        for i in xrange(len(self.ColVals)):
+        for i in range(len(self.ColVals)):
             self.Data[(len(self.RowVals),i)] = new_fxy[i]
 
         self.AppendRow(new_rowval)
@@ -61,7 +61,7 @@ class InterpTable:
         lr=len(self.RowVals)
         for i in range(len(new_colvals)):
             self.AppendColAndInsert(new_colvals[i],\
-                        new_fxy[i*lr:(i+1)*lr]
+                        new_fxy[i*lr:(i+1)*lr])
 
 # ######################################################
 
@@ -71,7 +71,7 @@ class InterpTable:
         new_fxy = list, len(new_fxy) == len(self.RowVals)
         '''
         assert(len(new_fxy) == len(self.RowVals))
-        for i in xrange(len(self.RowVals)):
+        for i in range(len(self.RowVals)):
             self.Data[(i,len(self.ColVals))] = new_fxy[i]
 
         self.AppendCol(new_colval)
@@ -184,7 +184,7 @@ class InterpTable:
         l = 0
         u = len(self.RowVals)-1
         while (1):
-            m = (l+u)/2 
+            m = (l+u)//2 
             if (self.RowVals[m] < row): l = m
             elif (self.RowVals[m] > row): u = m
             else: break
@@ -206,7 +206,7 @@ class InterpTable:
         l = 0
         u = len(self.ColVals)-1
         while (1):
-            m = (l+u)/2 
+            m = (l+u)//2 
             if (self.ColVals[m] < col): l = m
             elif (self.ColVals[m] > col): u = m
             else: break
@@ -276,29 +276,29 @@ if __name__ == "__main__":
         for j in range(len(col_vals)):
             table.Insert(i,j,row_vals[i]*col_vals[j]) 
 
-    print table.RowVals
-    print ' [1.0, 2.0, 3.0, 4.0, 5.0]'
-    print table.ColVals
-    print ' [10.0, 20.0, 30.0, 40.0]'
-    print table.Data
-    print ' {(0, 1): 20.0, (1, 2): 60.0, (3, 2): 120.0, (0, 0): 10.0, '
-    print ' (3, 3): 160.0, (3, 0): 40.0, (3, 1): 80.0, (2, 1): 60.0, '
-    print ' (0, 2): 30.0, (2, 0): 30.0, (1, 3): 80.0, (2, 3): 120.0, '
-    print ' (4, 3): 200.0, (2, 2): 90.0, (1, 0): 20.0, (4, 2): 150.0, '
-    print ' (0, 3): 40.0, (4, 1): 100.0, (1, 1): 40.0, (4, 0): 50.0} '
+    print(table.RowVals)
+    print(' [1.0, 2.0, 3.0, 4.0, 5.0]')
+    print(table.ColVals)
+    print(' [10.0, 20.0, 30.0, 40.0]')
+    print(table.Data)
+    print(' {(0, 1): 20.0, (1, 2): 60.0, (3, 2): 120.0, (0, 0): 10.0, ')
+    print(' (3, 3): 160.0, (3, 0): 40.0, (3, 1): 80.0, (2, 1): 60.0, ')
+    print(' (0, 2): 30.0, (2, 0): 30.0, (1, 3): 80.0, (2, 3): 120.0, ')
+    print(' (4, 3): 200.0, (2, 2): 90.0, (1, 0): 20.0, (4, 2): 150.0, ')
+    print(' (0, 3): 40.0, (4, 1): 100.0, (1, 1): 40.0, (4, 0): 50.0} ')
 
-    print "f(1.5,15.0): ", table.Evaluate(1.5,15.0)
-    print ' f(1.5,15.0):  22.5'
-    print "f(4.5,15.0): ", table.Evaluate(4.5,15.0)
-    print ' f(4.5,15.0):  67.5'
-    print "f(1.5,35.0): ", table.Evaluate(1.5,35.0)
-    print ' f(1.5,35.0):  52.5'
-    print "f(4.75,30.0): ", table.Evaluate(4.75,30.0)
-    print ' f(4.75,30.0):  142.5'
-    print "f(4.75,40.0): ", table.Evaluate(4.75,40.0)
-    print ' f(4.75,40.0):  190.0'
-    print "f(4.75,37.5): ", table.Evaluate(4.75,37.5)
-    print ' f(4.75,37.5):  178.125'
+    print("f(1.5,15.0): ", table.Evaluate(1.5,15.0))
+    print(' f(1.5,15.0):  22.5')
+    print("f(4.5,15.0): ", table.Evaluate(4.5,15.0))
+    print(' f(4.5,15.0):  67.5')
+    print("f(1.5,35.0): ", table.Evaluate(1.5,35.0))
+    print(' f(1.5,35.0):  52.5')
+    print("f(4.75,30.0): ", table.Evaluate(4.75,30.0))
+    print(' f(4.75,30.0):  142.5')
+    print("f(4.75,40.0): ", table.Evaluate(4.75,40.0))
+    print(' f(4.75,40.0):  190.0')
+    print("f(4.75,37.5): ", table.Evaluate(4.75,37.5))
+    print(' f(4.75,37.5):  178.125')
 
 ##    new_rows=[10.0,1.5]
 ##    new_cols=[15.0,100.0,5.0]

@@ -53,7 +53,7 @@ def readNodes(In,fac,center):
 		lin = line.split(" ")
 		key = int(lin.pop(0))
 		nodes[key] = [float(x)*fac for x in lin if x!='']
-		for i in xrange(len(nodes[key])):
+		for i in range(len(nodes[key])):
 			nodes[key][i] = nodes[key][i] + center[i]
 	return nodes
 
@@ -64,20 +64,20 @@ def Interp(input,out):
 	struct = container()
 	struct.Datums = dict()
 	struct.nodes = dict()
-	for z in input.Datums.keys():
+	for z in list(input.Datums.keys()):
 		struct.Datums[z] = dict()
-		for x in out.keys():
-			struct.Datums[z][x] = [0 for a in input.Datums[z][input.Datums[z].keys()[0]]]
-	for x in out.keys():  #out nodes
+		for x in list(out.keys()):
+			struct.Datums[z][x] = [0 for a in input.Datums[z][list(input.Datums[z].keys())[0]]]
+	for x in list(out.keys()):  #out nodes
 		sigma = 0
-		for y in input.nodes.keys():  #in nodes
+		for y in list(input.nodes.keys()):  #in nodes
 			D = dist(out[x],input.nodes[y])
 			weight = 1/D/D
 			sigma = sigma + weight
-			for z in struct.Datums.keys():  #data fields
+			for z in list(struct.Datums.keys()):  #data fields
 				upd = [weight*a for a in input.Datums[z][y]]
-				struct.Datums[z][x] = [struct.Datums[z][x][i]+upd[i] for i in xrange(len(upd))]
-		for z in struct.Datums.keys():
+				struct.Datums[z][x] = [struct.Datums[z][x][i]+upd[i] for i in range(len(upd))]
+		for z in list(struct.Datums.keys()):
 			struct.Datums[z][x] =  [a/sigma for a in struct.Datums[z][x]]
 		struct.nodes[x] = [a for a in out[x]]
 	return struct
@@ -85,12 +85,12 @@ def Interp(input,out):
 def writeFiles(out,name):
 	#write the new nodes file
 	nodfile = file(name+".nod",'w')
-	for x in out.nodes.keys():
+	for x in list(out.nodes.keys()):
 		string = str(x) + " " + str(out.nodes[x][0]) +" "+str(out.nodes[x][1])+" "+str(out.nodes[x][2])+"\n"
 		nodfile.write(string)
 	nodfile.close()
 	# do the datums
-	for y in out.Datums.keys():
+	for y in list(out.Datums.keys()):
 		ext = ""
 		dataname = ""
 		if (y.find("STRESS") >-1):
@@ -113,7 +113,7 @@ def writeFiles(out,name):
 			dataname = "#LIFE 0\n"
 		datafile = file(name+ext,'w')
 		datafile.write(dataname)
-		for x in out.Datums[y].keys():
+		for x in list(out.Datums[y].keys()):
 			string = str(x)
 			for z in out.Datums[y][x]:
 				string = string + " "

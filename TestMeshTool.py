@@ -20,15 +20,15 @@ def IsPointOutsideTest():
 
     # qpnt = u + trans
     qpnt=Vec3D.Vec3D(-1.63307890498,-6.22368282107,-17.7654257505)
-    print model1.IsPointOutsideMesh(qpnt)
+    print(model1.IsPointOutsideMesh(qpnt))
 
     u = Vec3D.Vec3D(-0.00030890498332,0.0010671789323,0.000474249487647)
     trans = Vec3D.Vec3D(-1.63277,-6.22475,-17.7659)
-    print "   0.9*u:", model1.IsPointOutsideMesh(0.9*u+trans)
-    print "0.9999*u:", model1.IsPointOutsideMesh(0.9999*u+trans)
-    print "   1.0*u:", model1.IsPointOutsideMesh(u+trans)
-    print " 1.001*u:", model1.IsPointOutsideMesh(1.001*u+trans)
-    print "   1.1*u:", model1.IsPointOutsideMesh(1.1*u+trans)
+    print("   0.9*u:", model1.IsPointOutsideMesh(0.9*u+trans))
+    print("0.9999*u:", model1.IsPointOutsideMesh(0.9999*u+trans))
+    print("   1.0*u:", model1.IsPointOutsideMesh(u+trans))
+    print(" 1.001*u:", model1.IsPointOutsideMesh(1.001*u+trans))
+    print("   1.1*u:", model1.IsPointOutsideMesh(1.1*u+trans))
 
 def CompareStress(stress1,stress2,zero):
     '''
@@ -36,7 +36,7 @@ def CompareStress(stress1,stress2,zero):
     '''
 
     found = 0
-    stuff=[() for i in xrange(6)]
+    stuff=[() for i in range(6)]
     if abs(stress1.xx()-stress2.xx()) > zero:
         found = 1
         stuff[0] +=('stress xx not the same ',stress1.xx(),stress2.xx())
@@ -57,7 +57,7 @@ def CompareStress(stress1,stress2,zero):
         stuff[5] +=('stress zx not the same',stress1.zx(),stress2.zx())
 
     if found:
-        raise CompStress, stuff
+        raise CompStress(stuff)
     else:
         return 1
 
@@ -67,7 +67,7 @@ def CompareDisp(disp1,disp2,zero):
     '''
 
     found = 0
-    stuff=[() for i in xrange(6)]
+    stuff=[() for i in range(6)]
     if abs(disp.x()-disp2.x()) > zero:
         found = 1
         stuff[0] +=('disp x not the same ',disp1.x(),disp2.x())
@@ -79,7 +79,7 @@ def CompareDisp(disp1,disp2,zero):
         stuff[2] +=('disp z not the same',disp1.z(),disp2.z())
 
     if found:
-        raise CompDisp, stuff
+        raise CompDisp(stuff)
     else:
         return 1
 
@@ -90,11 +90,11 @@ def CompareToItself(model1,model2,list1,list2,zero):
     '''
 
     #   1
-    print "  TEST locations, stress and disp from GetNodeInfo:"
+    print("  TEST locations, stress and disp from GetNodeInfo:")
     for nid1 in list1:
         nid2=list2[list1.index(nid1)]
         if nid1 != nid2:
-            print 'lists are not identical'
+            print('lists are not identical')
         (loc1,disp1,stress1) = model1.GetNodeInfo(nid1)
         (loc2,disp2,stress2) = model2.GetNodeInfo(nid2)
         if (loc1-loc2).Magnitude() > zero:
@@ -103,30 +103,30 @@ def CompareToItself(model1,model2,list1,list2,zero):
             samestress = CompareStress(stress1,stress2,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s and %s' %(nid1,nid2)+"\n"
                 errormsg += '   the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
+            print(errormsg)
 
         # compare displacements: 
         try: 
             samedisp = CompareDisp(disp1,disp2,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompDisp, msg:
+        except CompDisp as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s and %s' %(nid1,nid2)+"\n"
                 errormsg += '    the disp are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
 
     #   2
-    print "  TEST GetPtStress vs. GetNodeInfo (model1):"
+    print("  TEST GetPtStress vs. GetNodeInfo (model1):")
     for nid1 in list1:
         (loc1,disp1,stress1) = model1.GetNodeInfo(nid1)
         stress11 = model1.GetPtStress(loc1)
@@ -134,17 +134,17 @@ def CompareToItself(model1,model2,list1,list2,zero):
             samestress = CompareStress(stress11,stress1,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s in model 1' %(nid1)+"\n"
                 errormsg += '    the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
 
     #   3
-    print "  TEST GetPtStress vs. GetNodeInfo (model2):"
+    print("  TEST GetPtStress vs. GetNodeInfo (model2):")
     for nid2 in list2:
         (loc2,disp2,stress2) = model2.GetNodeInfo(nid2)
         stress22 = model2.GetPtStress(loc2)
@@ -152,21 +152,21 @@ def CompareToItself(model1,model2,list1,list2,zero):
             samestress = CompareStress(stress22,stress2,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s in model 2' %(nid2)+"\n"
                 errormsg += '    the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
 
     #   4
-    print "  TEST GetPtStress at a Vec3D"
+    print("  TEST GetPtStress at a Vec3D")
     for nid1 in list1:
         nid2=list2[list1.index(nid1)]
         if nid1 != nid2:
-            print 'lists are not identical'
+            print('lists are not identical')
         (loc1,disp1,stress1) = model1.GetNodeInfo(nid1)
         stress11 = model1.GetPtStress(loc1)
         (loc2,disp2,stress2) = model2.GetNodeInfo(nid2)
@@ -175,14 +175,14 @@ def CompareToItself(model1,model2,list1,list2,zero):
             samestress = CompareStress(stress11,stress22,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s and %s' %(nid1,nid2)+"\n"
                 errormsg += '    the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
 
         #currently not tested:  
 ##        .GetPtDisp(pnt)
@@ -201,13 +201,13 @@ def Func(model,qpnt):
     function.
     '''
 
-    print ' Pnt stress:'
-    print 'MeshTools',
+    print(' Pnt stress:')
+    print('MeshTools', end=' ')
     sig = model.GetPtStress(qpnt)
     sigG=[[sig.xx(), sig.xy(), sig.zx()],
           [sig.xy(), sig.yy(), sig.yz()],
           [sig.zx(), sig.yz(), sig.zz()]]
-    print sig
+    print(sig)
 
 def MakeLists(filename,conpath,surface,doid_range,model):
     '''
@@ -261,50 +261,50 @@ def OrgTest(mmodel,pnt,eid,nid):
     nid - an integer node i.d.
     '''
 
-    print ' Pnt stress:'
-    print 'MeshTools',mmodel.GetPtStress(pnt)
-    print 'FemModel (8.08523e-013 3.4 2.62242e-012 4.326e-013 1.00179e-014 4.7595e-012)'
-    print ' '
-    print ' Pnt Disp:'
-    print 'MeshTools', mmodel.GetPtDisp(pnt)
-    print 'FemModel None'
-    print ' '
-    print ' Node Info'
-    print 'MeshTools', mmodel.GetNodeInfo(nid)
-    print 'FemModel  (10 10 0, None, (-1.48313e-013 3.4 6.53739e-013 5.40886e-013 -4.63987e-013 1.45791e-012))'
-    print ' '
-    print ' Element Info' 
-    print 'MeshTools', mmodel.GetElemInfo(eid)
-    print 'FemModel [0, 6, 3, 8, 14, 24, 11, 25, 33, 15]'
-    print ' '
-    print ' Adjacent Elements'
-    print 'MeshTools', mmodel.GetAdjacentElems(nid)
-    print 'FemModel [12, 5]'
-    print ' '
-    print ' Surface Element info'
-    print 'MeshTools', mmodel.GetSurfElemInfo(eid)
-    print 'FemModel ([0, 3, 6], [11, 24, 14])'
-    print ' '
-    print ' Adjacent surface elements'
-    print 'MeshTools', mmodel.GetAdjacentSurfElems(nid)
-    print 'FemModel [2, 5]'
-    print ' '
-    print ' Is point outside mesh?' 
-    print 'MeshTools', mmodel.IsPointOutsideMesh(pnt)
-    print 'FemModel 1'
-    print ' '
-    print ' Is node on the surface?' 
-    print 'MeshTools', mmodel.IsSurfaceNode(nid)
-    print 'FemModel 1'
-    print ' '
-    print ' Surface Normal' 
-    print 'MeshTools', mmodel.SurfaceNormal(nid)
-    print 'FemModel (0.707107 0.707107 0, 0.35355339059327379)'
-    print ' '
-    print ' Adjacent surface edge lengths' 
-    print 'MeshTools', mmodel.GetAdjacentSurfEdgeLengths(nid)
-    print 'FemModel [10.0, 10.0]'
-    print ' '
+    print(' Pnt stress:')
+    print('MeshTools',mmodel.GetPtStress(pnt))
+    print('FemModel (8.08523e-013 3.4 2.62242e-012 4.326e-013 1.00179e-014 4.7595e-012)')
+    print(' ')
+    print(' Pnt Disp:')
+    print('MeshTools', mmodel.GetPtDisp(pnt))
+    print('FemModel None')
+    print(' ')
+    print(' Node Info')
+    print('MeshTools', mmodel.GetNodeInfo(nid))
+    print('FemModel  (10 10 0, None, (-1.48313e-013 3.4 6.53739e-013 5.40886e-013 -4.63987e-013 1.45791e-012))')
+    print(' ')
+    print(' Element Info') 
+    print('MeshTools', mmodel.GetElemInfo(eid))
+    print('FemModel [0, 6, 3, 8, 14, 24, 11, 25, 33, 15]')
+    print(' ')
+    print(' Adjacent Elements')
+    print('MeshTools', mmodel.GetAdjacentElems(nid))
+    print('FemModel [12, 5]')
+    print(' ')
+    print(' Surface Element info')
+    print('MeshTools', mmodel.GetSurfElemInfo(eid))
+    print('FemModel ([0, 3, 6], [11, 24, 14])')
+    print(' ')
+    print(' Adjacent surface elements')
+    print('MeshTools', mmodel.GetAdjacentSurfElems(nid))
+    print('FemModel [2, 5]')
+    print(' ')
+    print(' Is point outside mesh?') 
+    print('MeshTools', mmodel.IsPointOutsideMesh(pnt))
+    print('FemModel 1')
+    print(' ')
+    print(' Is node on the surface?') 
+    print('MeshTools', mmodel.IsSurfaceNode(nid))
+    print('FemModel 1')
+    print(' ')
+    print(' Surface Normal') 
+    print('MeshTools', mmodel.SurfaceNormal(nid))
+    print('FemModel (0.707107 0.707107 0, 0.35355339059327379)')
+    print(' ')
+    print(' Adjacent surface edge lengths') 
+    print('MeshTools', mmodel.GetAdjacentSurfEdgeLengths(nid))
+    print('FemModel [10.0, 10.0]')
+    print(' ')
 
 def SelfConsistent(model,list,zero):
     '''
@@ -312,7 +312,7 @@ def SelfConsistent(model,list,zero):
     returns the same stress.
     '''
 
-    print " TEST stress from GetNodeInfo:"
+    print(" TEST stress from GetNodeInfo:")
     for nid in list:
         (loc1,disp1,stress1) = model.GetNodeInfo(nid)
         (loc2,disp2,stress2) = model.GetNodeInfo(nid)
@@ -321,16 +321,16 @@ def SelfConsistent(model,list,zero):
             samestress = CompareStress(stress1,stress2,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s' %(nid)+"\n"
                 errormsg += '    the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
 
-    print "  TEST GetPtStress:"
+    print("  TEST GetPtStress:")
     for nid in list:
         (loc1,disp1,stress1) = model.GetNodeInfo(nid)
         (loc2,disp2,stress2) = model.GetNodeInfo(nid)
@@ -340,14 +340,14 @@ def SelfConsistent(model,list,zero):
             samestress = CompareStress(stress11,stress22,zero)
         except KeyboardInterrupt:
                 raise 'KeyboardInterrupt'
-        except CompStress, msg:
+        except CompStress as msg:
             errormsg=''
             for ms in msg:
                 errormsg += ms[0] + ' at node %s' %(nid)+"\n"
                 errormsg += '    the stress are %1.6e and %1.6e' % (ms[1],ms[2])
                 errormsg += "\n"
-            print errormsg
-    print "\n"
+            print(errormsg)
+    print("\n")
         
 
 if __name__ == "__main__":
@@ -390,7 +390,7 @@ if __name__ == "__main__":
     model1 = MeshTools.MeshTools(path+filename,'RDB')
     model1.SetPointInsideTolerance(0.00000000001)
 
-    print model1.GetMaxDimension()
+    print(model1.GetMaxDimension())
 ##    model2 = MeshTools.MeshTools(path+filename,'FEM')
 ##
 ##    node_list1,doid_list1=MakeLists(filename,path,1,None,model1)

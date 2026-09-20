@@ -42,7 +42,7 @@ def _GetIndex(value,cvalues):
     elif value >= cvalues[-1]:
         return len(cvalues)
     else:
-        for i in xrange(len(cvalues)-1):
+        for i in range(len(cvalues)-1):
             if value >= cvalues[i] and value < cvalues[i+1]:
                 return i+1
 
@@ -60,14 +60,14 @@ def _AddOneMid(index,w1,w2,coord_1,coord_2,con_list):
 def _AddMidPts(index_1,index_2,value_1,value_2,coord_1,coord_2,
                cvalues,con_list):
     if index_1 < index_2:
-        for i in xrange(index_1,index_2):
+        for i in range(index_1,index_2):
             w1 = (value_2-cvalues[i]) / (value_2-value_1)
             w2 = 1.0 - w1
             _AddOneMid(i,w1,w2,coord_1,coord_2,con_list)
             if w2 != 1.0:
                 _AddOneMid(i+1,w1,w2,coord_1,coord_2,con_list)
     else:
-        for i in xrange(index_1,index_2,-1):
+        for i in range(index_1,index_2,-1):
             w1 = (value_2-cvalues[i-1]) / (value_2-value_1)
             w2 = 1.0 - w1
             if w1 != 1.0:
@@ -92,13 +92,13 @@ def Contour(coords,values,cvalues,pgon_func,pgon_data):
     # create the num_points list
 
     con_list = []
-    for i in xrange(len(cvalues)+1):
+    for i in range(len(cvalues)+1):
         tmp_list = []
         con_list.append(tmp_list)
 
     # add the vertex nodes to the lists
 
-    for i in xrange(len(coords)):
+    for i in range(len(coords)):
         j = (i+1) % len(coords)
         con_list[c_index[i]].append((coords[i][0],coords[i][1],coords[i][2]))
 
@@ -112,7 +112,7 @@ def Contour(coords,values,cvalues,pgon_func,pgon_data):
     # now display all the necessary polygons
 ##    print 'con_list:', con_list
 
-    for i in xrange(len(cvalues)+1):
+    for i in range(len(cvalues)+1):
         if len(con_list[i]) >= 3:
             pgon_func(pgon_data,con_list[i],i)
 
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     file = open('''test_contour.svw''', 'w')
 
     # first make cvalues
-    cvalues = range(0,1000,100)
+    cvalues = list(range(0,1000,100))
 
     # make up some geometry (a square with two 6-noded surface triangles)
     coords=[[[0, 0, 0], [0.5, 0, 0], [0, 0.5, 0]], \
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 ##    coords=[[0,0,0],[1,0,0],[0,1,0]]
 ##    values=[800,700,700]
 
-    for i in xrange(len(values)):
+    for i in range(len(values)):
         coord=coords[i]
         value=values[i]
         Contour(coord,value,cvalues,pgon_func,file)

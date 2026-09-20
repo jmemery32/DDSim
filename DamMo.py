@@ -1,5 +1,6 @@
 
-import os, sys, math, numpy as Numeric, cPickle, types
+import os, sys, math, pickle, types
+import numpy as np
 
 # wash
 import Vec3D
@@ -27,11 +28,11 @@ def holdit():
     '''
     a little function for debugging.
     '''
-    print ' '
-    print ' ################################################'
-    print " ---> hit enter to close figure and move on <---"
-    print ' ################################################'
-    print ' '
+    print(' ')
+    print(' ################################################')
+    print(" ---> hit enter to close figure and move on <---")
+    print(' ################################################')
+    print(' ')
     c = sys.stdin.read(1)
 
 def DumpFile(xlist,ylist,filename):
@@ -129,7 +130,7 @@ class DamModel:
         Flag=0;
 ##        while Flag == 0:
         # counting to iters will hopefully get us a will_grow == 2!
-        for count in xrange(iters):
+        for count in range(iters):
             # First answer the question, is this an interesting case?  Also,
             # WillGrow should return change of shape info as necessary.
 
@@ -141,7 +142,7 @@ class DamModel:
                     self.__dam_elems[did][-1].WillGrow(self.model,material, \
                                                        0.0,self.CMesh,Scale)
             except KeyboardInterrupt:
-                raise 'KeyboardInterrupt'
+                raise
             except:
                 will_grow=2
                 # remove the last stuff in DamHistory because we couldn't
@@ -225,11 +226,11 @@ class DamModel:
 ######## DamModel
 
     def GiveCurrentGeo(self,doid):
-        as=[]
+        alist=[]
         for a in self.DamOro[doid].DamEl[-1].a:
-            as+=[a[0][-1]]
+            alist+=[a[0][-1]]
 
-        return as
+        return alist
 
 ######## DamModel
 
@@ -284,28 +285,28 @@ class DamModel:
                     Integration.RK5_CKslope_vector(self.DamOro[doid].nextdN,\
                     N,abab,DamEl.dAdN,[scale],max_er,.05)
 
-            except DamErrors.FitPolyError, message:
+            except DamErrors.FitPolyError as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for', \
-                          message[0],'at doid', doid, 'due to'
-                    print '     ', message[1]
+                    print((' switch to one step fwd Euler for', \
+                          message[0],'at doid', doid, 'due to'))
+                    print(('     ', message[1]))
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
 
-            except DamErrors.dAdNError, message:
+            except DamErrors.dAdNError as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for', \
-                          message[0],'at doid', doid, 'due to',message[1]
+                    print((' switch to one step fwd Euler for', \
+                          message[0],'at doid', doid, 'due to',message[1]))
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
 
-            except ValueError, message:
+            except ValueError as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for Fellipse', \
-                          'at doid', doid, 'due to'
-                    print '     ', message[0] 
+                    print((' switch to one step fwd Euler for Fellipse', \
+                          'at doid', doid, 'due to'))
+                    print(('     ', message[0])) 
                 rate = Integration.Eulerslope_vector( \
                     self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
                 self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
@@ -400,7 +401,7 @@ class DamModel:
         this seems a little funny because the dNs are already Nj - Nj-1...
         '''
 
-        As,types,as,dNs=self.InterpolateLifeLists(doid)
+        As,types,alist,dNs=self.InterpolateLifeLists(doid)
         
 
         # if self.DamOro[doid].WillGrow = 0, means the LARGEST crack stopped 
@@ -412,8 +413,8 @@ class DamModel:
 
         # to determine the appropriate damage type and calc crack area:
         j = -1
-        for i in range(len(as)):
-            if as[i] > ai:
+        for i in range(len(alist)):
+            if alist[i] > ai:
                 j = i
                 break
 
@@ -421,9 +422,9 @@ class DamModel:
             if j == 0: type = types[0]
             else: type = types[j-1]
         except IndexError:
-            print j, doid, ai, self.DamOro[doid].WillGrow
-            print self.DamOro[doid].DamEl[-1]
-            print as
+            print((j, doid, ai, self.DamOro[doid].WillGrow))
+            print((self.DamOro[doid].DamEl[-1]))
+            print(alist)
             raise
 
         if type == 0:
@@ -434,14 +435,14 @@ class DamModel:
 
         # find j again by comparing crack areas 
         j = -1
-        for i in range(len(as)):
+        for i in range(len(alist)):
             if As[i] > Ai:
                 j = i
                 break
 
         # calculate life
         if j > 0:
-            N=Numeric.sum(dNs[j+1:])
+            N=np.sum(dNs[j+1:])
             N+=(As[j]-Ai)*dNs[j]/(As[j]-As[j-1])
             if N > N_max:
                 N=N_max*1.01
@@ -460,10 +461,10 @@ class DamModel:
 ######## DamModel
 
     def InterpolateLifeLists(self,doid):
-        As=[]; types=[]; as=[]; dNs=[]
+        As=[]; types=[]; alist=[]; dNs=[]
         for DamEl in self.DamOro[doid].DamEl:
-            DamEl.AppendInterpolateLifeLists(As,types,as,dNs)
-        return As,types,as,dNs
+            DamEl.AppendInterpolateLifeLists(As,types,alist,dNs)
+        return As,types,alist,dNs
 
 ######## DamModel
 
@@ -474,7 +475,7 @@ class DamModel:
         stuff=[]
         if self.parameters.monte:
             for set in self.DamOro[doid].N.rv:
-                for key in set.keys(): # key is RID
+                for key in list(set.keys()): # key is RID
                     if set[key] < self.parameters.N_max:
                         stuff+=[[doid,key,int(set[key])]]
         else: stuff+=[[doid,0,int(self.DamOro[doid].Life)]]
@@ -497,66 +498,66 @@ class DamModel:
         dashplus+='-----------------'
 
         if doid == 'all':
-            for i in self.DamOro.keys():
+            for i in list(self.DamOro.keys()):
                 xyz,delxyz,sigxyz=self.model.GetNodeInfo(i)
-                print ''
-                print '---------------- Damage Origin id = %8i' % (i), \
-                      '------------------'
-                print ' coords         = ', xyz
-                print ' initial a      = ', self.DamOro[i].ai
-                print ' Predicted Life = ', self.DamOro[i].Life
+                print('')
+                print(('---------------- Damage Origin id = %8i' % (i), \
+                      '------------------'))
+                print((' coords         = ', xyz))
+                print((' initial a      = ', self.DamOro[i].ai))
+                print((' Predicted Life = ', self.DamOro[i].Life))
 
                 if dam == 'all':
-                    print ' **** Damage Elements: '
+                    print(' **** Damage Elements: ')
                     for damel in self.DamOro[i].DamEl:
-                        print damel
+                        print(damel)
 
                 if monte:
-                    print ' '
+                    print(' ')
                     # initial area = initial area of full ellipse! 
-                    print '     set |    initial a    |  initial area   |',\
-                    '  predicted life'
-                    print dashplus
+                    print(('     set |    initial a    |  initial area   |',\
+                    '  predicted life'))
+                    print(dashplus)
                     if set == 'all':
                         for ij in range(self.parameters.sets):
-                            init_a_set=self.ais.rv[ij].keys()
+                            init_a_set=list(self.ais.rv[ij].keys())
                             init_a_set.sort()
                             for ai in init_a_set:
                                 RID=self.ais.rv[ij][ai]
                                 for rid in RID:
-                                    print '%8i | %15.6e | %15.6e |   %.0f' % \
+                                    print(('%8i | %15.6e | %15.6e |   %.0f' % \
                                           (ij, \
                                           ai,(ai**2)*math.pi, \
-                                          self.DamOro[i].N.rv[ij][rid])
+                                          self.DamOro[i].N.rv[ij][rid])))
                             s="  Sample Mean = %10i " % \
                                (int(self.DamOro[i].N.SampleMean(ij)))
                             s+="|  Sample Stnd Dev = %10i" % \
                                   (int(math.sqrt(\
                                       self.DamOro[i].N.SampleVariance(ij))))
-                            print s
-                            print dashplus
+                            print(s)
+                            print(dashplus)
                     else:
-                        init_a_set=self.ais.rv[set].keys()
+                        init_a_set=list(self.ais.rv[set].keys())
                         init_a_set.sort()
                         for ai in init_a_set:
                             RID=self.ais.rv[set][ai]
-                            print '%8i | %15.6e | %15.6e |   %.0f' % (ij, \
+                            print(('%8i | %15.6e | %15.6e |   %.0f' % (ij, \
                                   ai,(ai**2)*math.pi, \
-                                  self.DamOro[i].N.rv[set][RID])
-                        print "         Sample Mean = ", \
-                              int(self.DamOro[i].N.SampleMean(set))
-                        print dashplus
-                print dashes,"\n"
+                                  self.DamOro[i].N.rv[set][RID])))
+                        print(("         Sample Mean = ", \
+                              int(self.DamOro[i].N.SampleMean(set))))
+                        print(dashplus)
+                print((dashes,"\n"))
 
         elif doid != 'none':
-            print ''
-            print '---------------- Damage Origin id = %8i' % (doid), \
-                  '------------------'
-            print ' coords         = ', self.__DamOro[doid].coords
-            print ' dam_list       = ', self.__DamOro[doid].dam_list
-            print ' initial a      = ', self.__DamOro[doid].ai
-            print ' Predicted Life = ', self.__DamOro[doid].Life
-            print dashes,"\n"
+            print('')
+            print(('---------------- Damage Origin id = %8i' % (doid), \
+                  '------------------'))
+            print((' coords         = ', self.__DamOro[doid].coords))
+            print((' dam_list       = ', self.__DamOro[doid].dam_list))
+            print((' initial a      = ', self.__DamOro[doid].ai))
+            print((' Predicted Life = ', self.__DamOro[doid].Life))
+            print((dashes,"\n"))
 
 ######## DamModel
 
@@ -805,7 +806,7 @@ class DamModel:
         set  - the set from which to write mean value for
         '''
 
-        DamKeys=self.DamOro.keys()
+        DamKeys=list(self.DamOro.keys())
         DamKeys.sort()
 
         MAPFile.write('LIFE 0'+"\n")
@@ -833,24 +834,24 @@ class DamModel:
         if doid=='all':
             dumpfile=open(filename,'w+b')
             damage_list={}
-            for i in self.DamOro.keys(): # doid 
+            for i in list(self.DamOro.keys()): # doid 
                 damage_list[i] = self.DamOro[i].N
-            cPickle.dump(damage_list,dumpfile,2)
+            pickle.dump(damage_list,dumpfile,2)
             dumpfile.close()
 
         else:
             try:
                 readfile=open(filename,'r+b')
-                damage_list=cPickle.load(readfile)
+                damage_list=pickle.load(readfile)
                 readfile.close()
                 damage_list[doid]=self.DamOro[doid].N
                 dumpfile=open(filename,'w+b')
-                cPickle.dump(damage_list,dumpfile,2)
+                pickle.dump(damage_list,dumpfile,2)
                 dumpfile.close()
             except IOError:
                 damage_list={doid:self.DamOro[doid].N}
                 dumpfile=open(filename,'w+b')
-                cPickle.dump(damage_list,dumpfile,2)
+                pickle.dump(damage_list,dumpfile,2)
                 dumpfile.close()
 
 ######## DamModel
@@ -888,7 +889,7 @@ class DamModel:
                 self.SurfaceNodeIds += [nid]
                 list_seids = self.model.GetAdjacentSurfElems(nid)
                 for seid in list_seids:
-                    if self.SurfaceElements.has_key(seid):
+                    if seid in self.SurfaceElements:
                         continue
                     else:
                         SurfaceNidList = self.model.GetSurfElemInfo(seid)
@@ -928,7 +929,7 @@ class DamModel:
                     self.SurfaceNodesCoords[-1] += \
                                             [self.model.GetNodeInfo(snid)[0]]
                 except MeshTools.InvalidNodeId:
-                    print snid
+                    print(snid)
                     raise
 
         # object for GeomUtils used in DamClass.Fellipse.__BuildPhi
@@ -1070,7 +1071,7 @@ class DamModel:
         i only want to run this for one doid runs, so pick the first damage
         element in DamOro.
         '''
-        keys=self.DamOro.keys()
+        keys=list(self.DamOro.keys())
         keys.sort()
 
         for Damage in self.DamOro[keys[0]].DamEl:
@@ -1216,11 +1217,11 @@ class DamModel:
 
     def Greater(self,a,aa):
         '''
-        return a Numeric.array containing the indices of a larger than the
+        return a np.array containing the indices of a larger than the
         corresponding entry in aa.
         '''
 
-##        z=[Numeric.greater(a[k],aa[k]) for k in range(len(aa))]
+##        z=[np.greater(a[k],aa[k]) for k in range(len(aa))]
 ##        j=[]
 ##        for zk in z:
 ##            zkk=zk.tolist()
@@ -1289,7 +1290,7 @@ class DamModel:
             # either compute K,da/dN, and new a's, exit or change damage shapes
             if damel == 0:
                 lena=DamEl.CrackFrontPoints
-                RANGE=range(lena)
+                RANGE=list(range(lena))
                 aa=[DamEl.a[i][0][-1] for i in RANGE]
                 percentDK,R=spec.Delta()
                 if inc:
@@ -1423,7 +1424,7 @@ class DamModel:
         if doid=='all':
             AfFile.write('Final_a 0'+"\n")
 
-            DamKeys=self.DamOro.keys()
+            DamKeys=list(self.DamOro.keys())
             DamKeys.sort()
 
             for i in DamKeys:
@@ -1444,7 +1445,7 @@ class DamModel:
         if doid == 'all':
             AFile.write('Initial_a 0'+"\n")
 
-            DamKeys=self.DamOro.keys()
+            DamKeys=list(self.DamOro.keys())
             DamKeys.sort()
 
             for i in DamKeys:
@@ -1463,7 +1464,7 @@ class DamModel:
         if doid=='all':
             RotFile.write('Orient 1'+"\n")
 
-            DamKeys=self.DamOro.keys()
+            DamKeys=list(self.DamOro.keys())
             DamKeys.sort()
 
             for i in DamKeys:

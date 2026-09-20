@@ -1,13 +1,13 @@
-import os, sys, math, numpy as Numeric
-import numpy.oldnumeric.linear_algebra as LinearAlgebra
-import cPickle
+import os, sys, math
+import numpy as np
+import pickle
 
 # wash
 import Vec3D
 import ColTensor
 import MeshTools
 import JohnsVectorTools as JVT
-import dadN as dadN
+import MydadN
 # John D
 import GeomUtils
 import Integration
@@ -20,11 +20,11 @@ def holdit():
     '''
     a little function for debugging.
     '''
-    print ' '
-    print ' ################################################'
-    print "         ---> hit enter to move on <---"
-    print ' ################################################'
-    print ' '
+    print(' ')
+    print(' ################################################')
+    print("         ---> hit enter to move on <---")
+    print(' ################################################')
+    print(' ')
     c = sys.stdin.read(1)
 
 def DumpFile(xlist,ylist,filename):
@@ -65,12 +65,12 @@ class Damage:
 
 ######## Damage
 
-    def AppendInterpolateLifeLists(self,As,types,as,dNs):
+    def AppendInterpolateLifeLists(self,As,types,alist,dNs):
         length=len(self.a[0][1])
         for i in range(length):
             if self.dN[i] >= 0.0:
                 ab=[self.a[k][0][i] for k in range(self.CrackFrontPoints)]
-                as+=[ab[0]]
+                alist+=[ab[0]]
                 As+=[self.CalcArea(ab)]
                 dNs+=[self.dN[i]]
                 if self.names[0]=='Fellipse': types+=[0]
@@ -113,7 +113,7 @@ class Damage:
         if len(x) < 2: return [],[]
 
         # create newx by adding ai+x[start:end]+af
-        z = Numeric.greater(x,ai)
+        z = np.greater(x,ai)
         z = z.tolist()
         # sometimes when the damage transitions, ai can be larger than any a's
         # in x.  If this happens return empty lists and, in Simpson, return 0
@@ -135,7 +135,7 @@ class Damage:
             end = len(x)-2
             af = x[-1]
         else:
-            z = Numeric.greater(x,af)
+            z = np.greater(x,af)
             z = z.tolist()
             end = z.index(1)-1
 
@@ -161,10 +161,10 @@ class Damage:
             try: 
                 Kf = K[end] + (af-x[end])* \
                      ((K[end+1]-K[end])/(x[end+1]-x[end]))
-            except IndexError, message:
-                print x, K, ai, af
-                print len(x), len(K)
-                raise DamErrors.ListsIndexError, (ai,af,start,end,message)
+            except IndexError as message:
+                print((x, K, ai, af))
+                print((len(x), len(K)))
+                raise DamErrors.ListsIndexError(ai,af,start,end,message)
             except ZeroDivisionError:
                 Kf = 0.0
 
@@ -211,7 +211,7 @@ class Damage:
         v2=v2.Normalize()
         v_ave=(v1+v2).Normalize()
         new_norm=-1.0*v_ave
-        new_norm=Numeric.dot(TRotation, \
+        new_norm=np.dot(TRotation, \
                          [new_norm.x(),new_norm.y(),new_norm.z()])
         new_norm=Vec3D.Vec3D(new_norm[0], new_norm[1], new_norm[2]).Normalize()
 
@@ -270,12 +270,12 @@ class Damage:
         Max,Min=model.GetMaxDimension()
         m=1.01*((Max-Min).Magnitude())
         a=0.5*(min(self.GiveCurrent()))
-        TRotation=Numeric.transpose(Rotation)
+        TRotation=np.transpose(Rotation)
 
-        u=Numeric.dot(TRotation,[(m*vec).x(),(m*vec).y(),(m*vec).z()])
+        u=np.dot(TRotation,[(m*vec).x(),(m*vec).y(),(m*vec).z()])
         Gu=Trans + Vec3D.Vec3D(u[0],u[1],u[2])
         (flagm,dist)=self.PointOutside(Gu,model)
-        u=Numeric.dot(TRotation,[(a*vec).x(),(a*vec).y(),(a*vec).z()])
+        u=np.dot(TRotation,[(a*vec).x(),(a*vec).y(),(a*vec).z()])
         Gu=Trans + Vec3D.Vec3D(u[0],u[1],u[2])
         (flaga,dist)=self.PointOutside(Gu,model)
 
@@ -287,7 +287,7 @@ class Damage:
             am=0.5*(a+m)
             # if a and m are with 1% or their average, break... 
             if (m-a)/am < 0.01: break
-            u=Numeric.dot(TRotation,[(am*vec).x(),(am*vec).y(),(am*vec).z()])
+            u=np.dot(TRotation,[(am*vec).x(),(am*vec).y(),(am*vec).z()])
             Gu=Trans + Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(Gu,model)
             if flag == flagm: m=am
@@ -396,7 +396,7 @@ class Damage:
         r = percentage of growth (like for 10% r = 1.10) 
         '''
 
-        RANGE=range(len(Klist))
+        RANGE=list(range(len(Klist)))
 
         # assumes R = 0.; if Kmax>Kic, use paris... 
         if max(Klist) > max([dadNobj[i].Kic for i in RANGE]):
@@ -451,7 +451,7 @@ class Damage:
         method is used to increase the dimensions of the ellipse.
         '''
 
-        RANGE=range(self.CrackFrontPoints)
+        RANGE=list(range(self.CrackFrontPoints))
 
         alist = [self.a[i][0][-1] for i in RANGE]
         Klist = [self.a[i][1][-1] for i in RANGE]
@@ -491,7 +491,7 @@ class Damage:
         norm=Vec3D.Vec3D(0,0,0) # to average
         count=0.0 # to keep track of how many normals are added to norm
         x_s=0.0; y_s=0.0; z_s=0.0 # for standard dev
-        RANGE=range(len(norms))
+        RANGE=list(range(len(norms)))
         for i in RANGE:
             flag=0 # add to this if duplicate normal
             for j in range(i+1,len(norms)):
@@ -693,7 +693,7 @@ class Damage:
         v_check=Vec3D.Vec3D(0,y0,z0)+v_ave
 
         # rotate into global coords
-        u=Numeric.dot(TRotation, \
+        u=np.dot(TRotation, \
                       [v_check.x(),v_check.y(),v_check.z()])
 
         # translate to damage origin
@@ -710,7 +710,7 @@ class Damage:
             check=0
 
         # and rotate so is in global coord system
-        norm=Numeric.dot(TRotation,[norm.x(),norm.y(),norm.z()])
+        norm=np.dot(TRotation,[norm.x(),norm.y(),norm.z()])
         norm=Vec3D.Vec3D(norm[0], norm[1], norm[2]).Normalize()
 
         return y0,z0,norm,angle,check
@@ -745,7 +745,7 @@ class Fellipse(Damage):
             Ki=self.__CalculateKi(a,b,self.Trans,scale)
             return Ki
 
-        except DamErrors.FitPolyError, message:
+        except DamErrors.FitPolyError as message:
             # for cases where the crack grows well outside the model,
             # model.GetPtStress returns 'point not in any elements'.  This is
             # flagged in __FitPoly and the K's are set to -10 (integer).  If 
@@ -753,9 +753,9 @@ class Fellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print ' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1] 
-                print ' **SIMULATION OK, means crack has out grown its welcome'
+                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
+                      'due to',message[1])) 
+                print(' **SIMULATION OK, means crack has out grown its welcome')
             return 4
 
 ######## Fellipse
@@ -809,10 +809,10 @@ class Fellipse(Damage):
         try:
             #coef=self.__FitPoly(model)
             coef=self.__FitPolynomial(a,b,center)
-        except MeshTools.EmptySearchResult, message:
-            raise DamErrors.FitPolyError, ('Fellipse',message)
-        except LinearAlgebra.LinAlgError, message:
-            raise DamErrors.FitPolyError, ('Fellipse',message)
+        except MeshTools.EmptySearchResult as message:
+            raise DamErrors.FitPolyError('Fellipse',message)
+        except np.linalg.LinAlgError as message:
+            raise DamErrors.FitPolyError('Fellipse',message)
 
 ##        print "biquadratic coefficients: y, z, y*y, y*z, z*z, 1.0"
 ##        print coef
@@ -827,14 +827,14 @@ class Fellipse(Damage):
         phi = 0.0
         KI=[]
         # loop to move parametric angle from 0 to 90 to 180 to 270...
-        for ii in xrange(4): 
-            same=((b/a)**0.5)*((a*a*(Numeric.sin(phi))**2+ \
-                                b*b*(Numeric.cos(phi)**2))**0.25)
+        for ii in range(4): 
+            same=((b/a)**0.5)*((a*a*(np.sin(phi))**2+ \
+                                b*b*(np.cos(phi)**2))**0.25)
             KI_0=(p00/E)*same
             I11_c=E-E1
             I11_s=E+E1
-            KI_1=(2.0/3.0)*same*((p10*a*Numeric.cos(phi)/I11_c)+ \
-                                 (p01*b*Numeric.sin(phi)/I11_s))
+            KI_1=(2.0/3.0)*same*((p10*a*np.cos(phi)/I11_c)+ \
+                                 (p01*b*np.sin(phi)/I11_s))
             I00_c=2.0*E
             I02_c=2.0*E1
             I22_c=E+E2
@@ -846,7 +846,7 @@ class Fellipse(Damage):
                 ((p20*a*a/2.0)-(p02*b*b/2.0)*I00_c)
             B2=p11*a*b/2.0*((I00_c*I22_c-I02_c*I02_c)/I22_s)
             KI_2=(8.0/(15.0*(I00_c*I22_c-I02_c*I02_c)))*same* \
-                 (A0+A2*Numeric.cos(2*phi)+B2*Numeric.sin(2*phi))
+                 (A0+A2*np.cos(2*phi)+B2*np.sin(2*phi))
             KI+=[(KI_0+KI_1+KI_2)*math.sqrt(math.pi)]
             phi=phi+(0.5*math.pi)
         if switched==1:
@@ -899,7 +899,7 @@ class Fellipse(Damage):
             a,b = (abab[0]+abab[2])/2.0 ,(abab[1]+abab[3])/2.0
             Xell = (abab[0]-abab[2])/2.0
             Yell = (abab[1]-abab[3])/2.0
-            trans=Numeric.dot(self.TRotation, \
+            trans=np.dot(self.TRotation, \
                           [0.0,Xell,Yell])
             localcenter=self.Trans + Vec3D.Vec3D(trans[0],trans[1],trans[2])
             KIs = self.__CalculateKi(a,b,localcenter,self.scale)
@@ -908,7 +908,7 @@ class Fellipse(Damage):
             foo.append(self.dadN[2].Calc_dadN(KIs[2], size[2],int(N)))
             foo.append(self.dadN[3].Calc_dadN(KIs[3], size[3],int(N)))
             if max(foo) <= 0.:
-                raise DamErrors.dAdNError, ('Fellipse',\
+                raise DamErrors.dAdNError('Fellipse',\
                                       'All growth rates <= 0.0',foo)
             return foo
 
@@ -936,8 +936,8 @@ class Fellipse(Damage):
                 # create dadN model for this instance
                 if self.dadN == None:
                     # note: with 0 (below), i hard code Kc = Kic in NASGRO eqn.
-                    self.dadN=[dadN.dadN(material,0),dadN.dadN(material,0), \
-                               dadN.dadN(material,0),dadN.dadN(material,0)]
+                    self.dadN=[MydadN.Willenborg(material,0),MydadN.Willenborg(material,0), \
+                               MydadN.Willenborg(material,0),MydadN.Willenborg(material,0)]
                 # calc.dadN...
                 da_dN = self.dadN[0].Calc_dadN(self.a[1][-1],a,int(N))
                 neg_da_dN = self.dadN[1].Calc_dadN(self.na[1][-1],neg_a,int(N))
@@ -969,28 +969,28 @@ class Fellipse(Damage):
                 junk,dN,self.nextdN = Integration.RK5_CKslope_vector(\
                     self.nextdN,N,[a,b,neg_a,neg_b],dAdN,max_er,.05)
 
-            except FitPolyDump, message:
+            except FitPolyDump as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for', \
-                          message[0],'at doid', self.doid, 'due to'
-                    print '     ', message[1]
+                    print((' switch to one step fwd Euler for', \
+                          message[0],'at doid', self.doid, 'due to'))
+                    print(('     ', message[1]))
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
 
-            except dAdNError, message:
+            except dAdNError as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for', \
-                          message[0],'at doid', self.doid, 'due to',message[1]
+                    print((' switch to one step fwd Euler for', \
+                          message[0],'at doid', self.doid, 'due to',message[1]))
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
 
-            except ValueError, message:
+            except ValueError as message:
                 if self.verbose:
-                    print ' switch to one step fwd Euler for Fellipse', \
-                          'at doid', self.doid, 'due to'
-                    print '     ', message[0] 
+                    print((' switch to one step fwd Euler for Fellipse', \
+                          'at doid', self.doid, 'due to'))
+                    print(('     ', message[0])) 
                 junk = Integration.Eulerslope_vector(self.nextdN/1000.0,N, \
                                                      [a,b,neg_a,neg_b],dAdN)
                 self.nextdN = self.nextdN/1000.0
@@ -1102,7 +1102,7 @@ class Fellipse(Damage):
         # update self.Trans.  Note, adding new position of center,
         # (0,y0_new,z0_new), w.r.t. ORIGINAL damage origin,
         # self.DamHistory['cent'][0]...
-        trans=Numeric.dot(self.TRotation, \
+        trans=np.dot(self.TRotation, \
                           [0.0,y0_new,z0_new])
         self.Trans=self.Trans + \
                    Vec3D.Vec3D(trans[0],trans[1],trans[2])
@@ -1120,7 +1120,7 @@ class Fellipse(Damage):
             b_his = open(path_name+'''.b''', 'a')
             _b_his = open(path_name+'''.nb''', 'a')
             dN = open(path_name+'''.dN''', 'a')
-            for i in xrange(len(self.DamHistory[0])):
+            for i in range(len(self.DamHistory[0])):
                 a_his.write(str(did)+' '+str(self.DamHistory['ab'][i][0])+  \
                                      ' '+str(self.DamHistory[0][i])+"\n")
                 _a_his.write(str(did)+' '+str(self.DamHistory['-ab'][i][0])+  \
@@ -1167,13 +1167,13 @@ class Fellipse(Damage):
         # __BuildPhi to replace __CheckPnts; 11/3/04 uses John D's
         # GeomUtils.pyd
         try: PhiList,CheckList = self.__BuildPhi(CMesh,a,b) #@
-        except DamErrors.BuildPhiError, info:
+        except DamErrors.BuildPhiError as info:
             inc = 0.01 # does not need to be relative to crack size because
             # Phi is parametric
             PhiList,CheckList = self.__CheckPnts(inc)
             if self.verbose: 
-                print " BuildPhi returns 1 or 3 phi's:", info
-                print " CheckPnts returns:", PhiList
+                print((" BuildPhi returns 1 or 3 phi's:", info))
+                print((" CheckPnts returns:", PhiList))
         # if this is a surface node and __BuildPhi returns len(PhiList)=0
         # GeomUtils may have failed to find the right points so use
         # __CheckPnts to reevaluate
@@ -1212,16 +1212,16 @@ class Fellipse(Damage):
                         self.__FourPoints(PhiList,CheckList,tol) #@
 
 ##        # to print the points in the global 
-##        u=Numeric.dot(self.TRotation,[0.0,y1a,z1a])
+##        u=np.dot(self.TRotation,[0.0,y1a,z1a])
 ##        qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##        print 'v', qpnt.x(), qpnt.y(), qpnt.z()
-##        u=Numeric.dot(self.TRotation,[0.0,y1b,z1b])
+##        u=np.dot(self.TRotation,[0.0,y1b,z1b])
 ##        qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##        print 'v', qpnt.x(), qpnt.y(), qpnt.z()
-##        u=Numeric.dot(self.TRotation,[0.0,y2a,z2a])
+##        u=np.dot(self.TRotation,[0.0,y2a,z2a])
 ##        qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##        print 'v', qpnt.x(), qpnt.y(), qpnt.z()
-##        u=Numeric.dot(self.TRotation,[0.0,y2b,z2b])
+##        u=np.dot(self.TRotation,[0.0,y2b,z2b])
 ##        qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##        print 'v', qpnt.x(), qpnt.y(), qpnt.z()
 ##        print y1a, z1a
@@ -1238,7 +1238,7 @@ class Fellipse(Damage):
                                        self.Trans) 
 
 ##        # to print the location of the new center
-##        u=Numeric.dot(self.TRotation,[0.0,y0_new,z0_new])
+##        u=np.dot(self.TRotation,[0.0,y0_new,z0_new])
 ##        qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##        print 'v', qpnt.x(), qpnt.y(), qpnt.z()
 ##        qpnt=self.Trans+norm
@@ -1403,7 +1403,7 @@ class Fellipse(Damage):
 
         # phi_L
         y,z=self.__yzfunc(a,b,rho,phi_L)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -1413,7 +1413,7 @@ class Fellipse(Damage):
 
         # phi_H
         y,z=self.__yzfunc(a,b,rho,phi_H)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -1424,7 +1424,7 @@ class Fellipse(Damage):
         while abs(phi_H-phi_L) > tol:
             phi_M=0.5*(phi_H+phi_L)
             y,z=self.__yzfunc(a,b,rho,phi_M)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -1454,7 +1454,7 @@ class Fellipse(Damage):
 
         # phi_L
         y,z=self.__yzfunc(a,b,rho_L,phi)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -1464,7 +1464,7 @@ class Fellipse(Damage):
 
         # phi_H
         y,z=self.__yzfunc(a,b,rho_H,phi)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -1477,7 +1477,7 @@ class Fellipse(Damage):
         while dist > tol:
             rho_M=0.5*(rho_H+rho_L)
             y,z=self.__yzfunc(a,b,rho_M,phi)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -1518,7 +1518,7 @@ class Fellipse(Damage):
         # don't fall on edges, which GeomUtils.EllipseCMeshIntersections()
         # is having a hard time with.  9-20-05:
 ##        teta=0.5*math.pi/180.0
-##        self.Rotation=Numeric.dot([[math.cos(teta), math.sin(teta),0.0],\
+##        self.Rotation=np.dot([[math.cos(teta), math.sin(teta),0.0],\
 ##                                   [-1.0*math.sin(teta),math.cos(teta),0.0],\
 ##                                   [0.0,0.0,1.0]],self.Rotation)
 
@@ -1564,7 +1564,7 @@ class Fellipse(Damage):
         # have
         for phi in PhiList:
             y,z=self.__yzfunc(a,b,1.0,phi+0.1)
-            u=Numeric.dot(self.TRotation,[0.0,y,z])
+            u=np.dot(self.TRotation,[0.0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
 
@@ -1579,12 +1579,12 @@ class Fellipse(Damage):
         # the volume (like could happen at a corner). 
         if len(PhiList) == 0:
             y,z=self.__yzfunc(a,b,1.0,1.0)
-            u=Numeric.dot(self.TRotation,[0.0,y,z])
+            u=np.dot(self.TRotation,[0.0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             # note, dialed-up the tolerance in FemModel.elements.PointInside!
             (flag1,dist1)=self.PointOutside(qpnt,self.model)
             y,z=self.__yzfunc(a,b,1.0,0.0)
-            u=Numeric.dot(self.TRotation,[0.0,y,z])
+            u=np.dot(self.TRotation,[0.0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             # note, dialed-up the tolerance in FemModel.elements.PointInside!
             (flag2,dist2)=self.PointOutside(qpnt,self.model)
@@ -1596,7 +1596,7 @@ class Fellipse(Damage):
         # when philist has 1 or 3 values it is nonsense.  raise an exception to
         # be handled in willgrow buy using my old method of finding phi's.
         if len(PhiList) == 1 or len(PhiList) == 3:
-            raise DamErrors.BuildPhiError, (PhiList)
+            raise DamErrors.BuildPhiError((PhiList))
 
         return PhiList,CheckList 
 
@@ -1611,7 +1611,7 @@ class Fellipse(Damage):
             e1=Vec3D.Vec3D(evect[0][0],evect[0][1],evect[0][2]).Normalize()
             e2=Vec3D.Vec3D(evect[1][0],evect[1][1],evect[1][2]).Normalize()
             e3=Vec3D.CrossProd(e1,e2).Normalize()
-            self.Rotation=Numeric.array([[e1.x(),e1.y(),e1.z()], \
+            self.Rotation=np.array([[e1.x(),e1.y(),e1.z()], \
                                          [e2.x(),e2.y(),e2.z()], \
                                          [e3.x(),e3.y(),e3.z()]])
         # otherwise permute now
@@ -1621,7 +1621,7 @@ class Fellipse(Damage):
             e1=Vec3D.Vec3D(evect[1][0],evect[1][1],evect[1][2]).Normalize()
             e2=Vec3D.Vec3D(evect[2][0],evect[2][1],evect[2][2]).Normalize()
             e3=Vec3D.CrossProd(e1,e2).Normalize()
-            self.Rotation=Numeric.array([[e1.x(),e1.y(),e1.z()], \
+            self.Rotation=np.array([[e1.x(),e1.y(),e1.z()], \
                                          [e2.x(),e2.y(),e2.z()], \
                                          [e3.x(),e3.y(),e3.z()]])
 
@@ -1636,7 +1636,7 @@ class Fellipse(Damage):
         '''
 
         # begin the search with the increment handed to __CheckPnts
-        for i in xrange(3):
+        for i in range(3):
 ##            print "i:", i
             PhiList=[]; CheckList=[]
             phi_L,phi_H,flag = self.__InOrOut(self.model,-1.01,inc)
@@ -1697,7 +1697,7 @@ class Fellipse(Damage):
 
         for y in ypnts: 
             for z in zpnts:
-                # u = Numeric.dot(self.TRotation,[0,y,z])
+                # u = np.dot(self.TRotation,[0,y,z])
                 u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
                 u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
                 u2=self.Rotation[1][2]*y+self.Rotation[2][2]*z
@@ -1712,8 +1712,8 @@ class Fellipse(Damage):
                       [sig.zx(), sig.yz(), sig.zz()]]
 
                 # sigL = R*sigG*R'
-                #R_sigG=Numeric.dot(self.Rotation,sigG)
-                #sigL=Numeric.dot(R_sigG,self.TRotation)
+                #R_sigG=np.dot(self.Rotation,sigG)
+                #sigL=np.dot(R_sigG,self.TRotation)
 
                 # fill matrix and right-hand-side vector
                 #f+=[sigL[0][0]]
@@ -1727,8 +1727,8 @@ class Fellipse(Damage):
         sigG=[[sig.xx(), sig.xy(), sig.zx()],
               [sig.xy(), sig.yy(), sig.yz()],
               [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=Numeric.dot(self.Rotation,sigG)
-        #sigL=Numeric.dot(R_sigG,self.TRotation)
+        #R_sigG=np.dot(self.Rotation,sigG)
+        #sigL=np.dot(R_sigG,self.TRotation)
         #f+=[sigL[0][0]]
         f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
             +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
@@ -1736,9 +1736,9 @@ class Fellipse(Damage):
         XY+=[[0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]
 
         # solve linear least squares problem (method of normal equations)
-        XYTXY=Numeric.dot(Numeric.transpose(XY),XY)
-        XYTf=Numeric.dot(Numeric.transpose(XY),f)
-        coef=LinearAlgebra.solve_linear_equations(XYTXY,XYTf)
+        XYTXY=np.dot(np.transpose(XY),XY)
+        XYTf=np.dot(np.transpose(XY),f)
+        coef=np.linalg.solve(XYTXY,XYTf)
 
         return coef
 
@@ -1813,7 +1813,7 @@ class Fellipse(Damage):
             z_check_2=0.5*(z1a+z2b)
 
             # check IsPointIn() for each
-            u=Numeric.dot(self.TRotation, \
+            u=np.dot(self.TRotation, \
                           [0.0,y_check_1,z_check_1])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist1)=self.PointOutside(qpnt,self.model)
@@ -1821,7 +1821,7 @@ class Fellipse(Damage):
 ##                check1 = 0
 ##            else:
 ##                check1 = 1
-            u=Numeric.dot(self.TRotation, \
+            u=np.dot(self.TRotation, \
                           [0.0,y_check_2,z_check_2])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist2)=self.PointOutside(qpnt,self.model)
@@ -1861,11 +1861,11 @@ class Fellipse(Damage):
                     order=[0,1,2,3]
 
         else:
-            print ' '
-            print ' exception print: PhiList:  ', PhiList
-            print ' exception print: CheckList:', CheckList
-            print ' '
-            raise ''' * len(PhiList) = 3, or > 4. See: Fellipse.__FourPoints'''
+            print(' ')
+            print((' exception print: PhiList:  ', PhiList))
+            print((' exception print: CheckList:', CheckList))
+            print(' ')
+            raise ValueError(' * len(PhiList) = 3, or > 4. See: Fellipse.__FourPoints')
         # note: this exception is raised if len(PhiList) == 1 too, although
         # this event should not happen!  
 
@@ -1895,7 +1895,7 @@ class Fellipse(Damage):
         # the origin of the unprime system must have a positive z' coordinate
         # in order for the semi-ellipse to encompass the same area.  Check
         # to see if this is true.
-        check_origin=-1.0*Numeric.dot(R,[[yb], [zb]])
+        check_origin=-1.0*np.dot(R,[[yb], [zb]])
         switch=0 # flag to indicate if orientation of y' must be switched
 
         if check_origin[1]< 0.0:
@@ -1921,7 +1921,7 @@ class Fellipse(Damage):
         incc=(phi_b-phi_a)
         indd=(2.0-(phi_a-phi_b))
 
-        for i in xrange(13):
+        for i in range(13):
             phi_check=phi_a+(incc*(float(i)/12.0))
             if switch == 1:
                 # if switch, want to increment phi backwards.
@@ -1933,7 +1933,7 @@ class Fellipse(Damage):
             y,z=self.__yzfunc(a,b,1,phi_check)
 
             # calc. their coords in prime system (origin at phi_b)
-            y_prime=Numeric.dot(R,[[y-yb],[z-zb]])
+            y_prime=np.dot(R,[[y-yb],[z-zb]])
 
             if y_prime[0]>max_y_prime:
                 max_y_prime = y_prime[0][0]
@@ -1954,10 +1954,10 @@ class Fellipse(Damage):
             y00,z00=0.0,0.0
         else:
             cent=[[min_y_prime+a_new],[0]]
-            cent=[[yb],[zb]]+Numeric.dot(Numeric.transpose(R),cent)
+            cent=[[yb],[zb]]+np.dot(np.transpose(R),cent)
             y00,z00=cent[0][0],cent[1][0]
 
-        trans=Numeric.dot(self.TRotation,[0.,y00,z00])
+        trans=np.dot(self.TRotation,[0.,y00,z00])
         trans=Vec3D.Vec3D(trans[0],trans[1],trans[2])+self.Trans
 
         # note: pass Hellipse - self.Rotation instead of self.Evect to assure
@@ -2018,7 +2018,7 @@ class Fellipse(Damage):
         max_y_prime=0.; max_z_prime=0.
         min_y_prime=0.; min_z_prime=0.;
 
-        for i in xrange(13):
+        for i in range(13):
             phi_check=phi_a+(phi_b-phi_a)*(float(i)/12.0)
             if switch == 1:
                 phi_check = phi_b+(2.0-(phi_b-phi_a))*(float(i)/12.0)
@@ -2029,7 +2029,7 @@ class Fellipse(Damage):
             y,z=self.__yzfunc(a,b,1,phi_check)
 
             # calc. their coords in double-prime system (origin at (y00,z00))
-            y_prime=Numeric.dot(R,[[y-y00],[z-z00]])
+            y_prime=np.dot(R,[[y-y00],[z-z00]])
 
             if y_prime[0][0]>max_y_prime:
                 max_y_prime = y_prime[0][0]
@@ -2050,10 +2050,10 @@ class Fellipse(Damage):
         # max_y_prime to account for the negative y_prime chunk.
         if min_y_prime < 0.0 and self.is_surf:
             # get the new center's coords in primed coords
-            u=Numeric.dot(Numeric.transpose(R),[min_y_prime,0.0])
+            u=np.dot(np.transpose(R),[min_y_prime,0.0])
 
             # get the new center's coords in global coords
-            qpnt=Numeric.dot(self.TRotation,[0.0, u[0],u[1]])
+            qpnt=np.dot(self.TRotation,[0.0, u[0],u[1]])
             qpnt=self.Trans+Vec3D.Vec3D(qpnt[0],qpnt[1],qpnt[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
 
@@ -2071,19 +2071,19 @@ class Fellipse(Damage):
                 dot = new_norm*norm
                 if dot < 0.5:
                     # for now, just print a message and use the old norm!  
-                    print "new_norm, norm:", new_norm, norm
+                    print(("new_norm, norm:", new_norm, norm))
                 else:
                     del(norm)
                     norm = new_norm
                     del(new_norm)
 
-        trans=Numeric.dot(self.TRotation,[0.,y00,z00])
+        trans=np.dot(self.TRotation,[0.,y00,z00])
         trans=Vec3D.Vec3D(trans[0],trans[1],trans[2])+self.Trans
 
         if max_y_prime <= 0.0:
-            raise 'dumm'
+            raise ValueError('dumm')
         if max_z_prime <= 0.0:
-            raise 'dumm'
+            raise ValueError('dumm')
 
         # pass self.Rotation instead of Evect to reflect __Rotation().  
         return Qellipse(self.doid,self.Trans,self.model,max_y_prime, \
@@ -2145,7 +2145,7 @@ class Fellipse(Damage):
 
         # check the phi_in first
         y,z=self.__yzfunc(a,b,1.0,phi_in)
-        u=Numeric.dot(self.TRotation,[0.0,y,z])
+        u=np.dot(self.TRotation,[0.0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         # FemModel.IsPointIn() returns 1 if point is inside the mesh and 0 if
         # the point is NOT in the mesh.
@@ -2164,7 +2164,7 @@ class Fellipse(Damage):
             flag=switch
             phi_in+=inc # incrementally increase phi_in
             y,z=self.__yzfunc(a,b,1,phi_in)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flago,dist)=self.PointOutside(qpnt,self.model)
             if flago == 1:
@@ -2289,7 +2289,7 @@ class Fellipse(Damage):
 
         '''
 
-        RANGE=range(4)
+        RANGE=list(range(4))
 
         if Ki==4: return 4
 
@@ -2304,7 +2304,7 @@ class Fellipse(Damage):
 ##        for i in xrange(4):
 ##            phi=float(i)/2.0 - 1.0
 ##            y,z=self.__yzfunc(a,b,1.0,phi)
-##            u=Numeric.dot(self.TRotation,[0,y,z])
+##            u=np.dot(self.TRotation,[0,y,z])
 ##            qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##            (flag,dist)=self.PointOutside(qpnt,self.model)
 ##            if flag == 1:
@@ -2382,7 +2382,7 @@ class Fellipse(Damage):
         self.Trans = center # location of cntr, update as necessary. currently,
                             # original center is always retrievable by
                             # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid)
-        self.dN=[] # list of time steps Numeric.sum(self.dN) = Life
+        self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
 
         # a boolean set to true in self.Rotation() if crack is turned normal to
@@ -2394,8 +2394,8 @@ class Fellipse(Damage):
         self.is_surf=model.IsSurfaceNode(doid)
         # set dadN & store material to pass to Hellipse or Qellipse
         self.material=material
-        self.dadN=[dadN.dadN(material,0),dadN.dadN(material,0), \
-                   dadN.dadN(material,0),dadN.dadN(material,0)]
+        self.dadN=[MydadN.Willenborg(material,0),MydadN.Willenborg(material,0), \
+                   MydadN.Willenborg(material,0),MydadN.Willenborg(material,0)]
         # initialize the plastic zone size
         for i in range(self.CrackFrontPoints): self.dadN[i].SetKol()
 
@@ -2406,7 +2406,7 @@ class Fellipse(Damage):
             e2=Vec3D.Vec3D(rotation[1][0],rotation[1][1], \
                            rotation[1][2]).Normalize()
             e3=Vec3D.CrossProd(e1,e2).Normalize()
-            self.Rotation=Numeric.array([[e1.x(),e1.y(),e1.z()], \
+            self.Rotation=np.array([[e1.x(),e1.y(),e1.z()], \
                                          [e2.x(),e2.y(),e2.z()], \
                                          [e3.x(),e3.y(),e3.z()]])
         else:
@@ -2416,7 +2416,7 @@ class Fellipse(Damage):
             e1=Vec3D.Vec3D(evect[0][0],evect[0][1],evect[0][2]).Normalize()
             e2=Vec3D.Vec3D(evect[1][0],evect[1][1],evect[1][2]).Normalize()
             e3=Vec3D.CrossProd(e1,e2).Normalize()
-            self.Rotation=Numeric.array([[e1.x(),e1.y(),e1.z()], \
+            self.Rotation=np.array([[e1.x(),e1.y(),e1.z()], \
                                          [e2.x(),e2.y(),e2.z()], \
                                          [e3.x(),e3.y(),e3.z()]])
 
@@ -2428,14 +2428,14 @@ class Fellipse(Damage):
 ##                       [1.0, 0.0, 0.0],
 ##                       [0.0, 0.0, -1.0]]
 
-        # store transpose(self.Rotation) to reduce calls to Numeric.Transpose
-        self.TRotation = Numeric.transpose(self.Rotation)
+        # store transpose(self.Rotation) to reduce calls to np.Transpose
+        self.TRotation = np.transpose(self.Rotation)
 
         if self.verification:
             self.verification=True
-            print self
-            print ' ',self.names[0], ' Rotation matrix is:'
-            print repr(Numeric.array(self.Rotation))+"\n"
+            print(self)
+            print((' ',self.names[0], ' Rotation matrix is:'))
+            print((repr(np.array(self.Rotation))+"\n"))
 
 ######## Fellipse
 
@@ -2456,7 +2456,7 @@ class Fellipse(Damage):
         size - a list of ellipses dimensions: [a, b, -a, -b]
         args - tuple of supporting arguments, in this case just scale! 
         '''
-        RANGE=range(4)
+        RANGE=list(range(4))
         # unpack args
         scale=args[0]
         growth = []
@@ -2464,7 +2464,7 @@ class Fellipse(Damage):
         a,b = (abab[0]+abab[2])/2.0 ,(abab[1]+abab[3])/2.0
         Xell = (abab[0]-abab[2])/2.0
         Yell = (abab[1]-abab[3])/2.0
-        trans=Numeric.dot(self.TRotation, \
+        trans=np.dot(self.TRotation, \
                       [0.0,Xell,Yell])
         localcenter=self.Trans + Vec3D.Vec3D(trans[0],trans[1],trans[2])
         KIs = self.__CalculateKi(a,b,localcenter,scale)
@@ -2472,7 +2472,7 @@ class Fellipse(Damage):
             growth.append(self.dadN[i].Calc_dadN(KIs[i],size[i],int(N)))
 
         if max(growth) <= 0.:
-            raise DamErrors.dAdNError, ('Fellipse',\
+            raise DamErrors.dAdNError('Fellipse',\
                                   'All growth rates <= 0.0',growth)
         return growth
 
@@ -2505,7 +2505,7 @@ class Hellipse(Damage):
 #  self.Rotation - stores the rotation matrix s.t.:
 #                        v = transpose(R)*v'
 #                             -OR-
-#  qpnt = Numeric.dot((self.TRotation,v_prime) + self.DamOro
+#  qpnt = np.dot((self.TRotation,v_prime) + self.DamOro
 #
 
 ######## Hellipse
@@ -2526,7 +2526,7 @@ class Hellipse(Damage):
             Ki=self.__CalculateKi(a,b,self.Trans,scale)
             return Ki
 
-        except DamErrors.FitPolyError, message:
+        except DamErrors.FitPolyError as message:
             # for cases where the crack grows well outside the model,
             # model.GetPtStress returns 'point not in any elements'.  This is
             # flagged in __FitPoly & the K's are set to -10 (integer). If this
@@ -2534,9 +2534,9 @@ class Hellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print ' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1] 
-                print ' **SIMULATION OK, means crack has out grown its welcome'
+                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
+                      'due to',message[1])) 
+                print(' **SIMULATION OK, means crack has out grown its welcome')
             return 4
 
 ######## Hellipse
@@ -2581,10 +2581,10 @@ class Hellipse(Damage):
 
         try:
             coef=self.__FitPolynomial(c,a,center)
-        except MeshTools.EmptySearchResult, message:
-            raise DamErrors.FitPolyError, ('Hellipse',message)
-        except LinearAlgebra.LinAlgError, message:
-            raise DamErrors.FitPolyError, ('Hellipse',message)
+        except MeshTools.EmptySearchResult as message:
+            raise DamErrors.FitPolyError('Hellipse',message)
+        except np.linalg.LinAlgError as message:
+            raise DamErrors.FitPolyError('Hellipse',message)
 
         A=coef[0]
         B=coef[1]
@@ -2695,7 +2695,7 @@ class Hellipse(Damage):
             _a_his = open(path_name+'''.na''', 'a')
             b_his = open(path_name+'''.b''', 'a')
             dN = open(path_name+'''.dN''', 'a')
-            for i in xrange(len(self.DamHistory[0])):
+            for i in range(len(self.DamHistory[0])):
                 a_his.write(str(did)+' '+str(self.DamHistory['aba'][i][0])+  \
                                      ' '+str(self.DamHistory[0][i])+"\n")
                 _a_his.write(str(did)+' '+str(self.DamHistory['aba'][i][2])+  \
@@ -2719,7 +2719,7 @@ class Hellipse(Damage):
         # update self.Trans.  Note, adding new position of center,
         # (0,y0_new,z0_new), w.r.t. ORIGINAL damage origin,
         # self.DamHistory['cent'][0]...
-        trans=Numeric.dot(self.TRotation, \
+        trans=np.dot(self.TRotation, \
                           [0.0,y0_new,0.0])
         self.Trans=self.Trans + \
                    Vec3D.Vec3D(trans[0],trans[1],trans[2])
@@ -2793,7 +2793,7 @@ class Hellipse(Damage):
                                         self.TRotation)
                     a_new=a-y0_new
                     b_new=b
-                    trans=Numeric.dot(self.TRotation, \
+                    trans=np.dot(self.TRotation, \
                                       [0.0,y0_new,z0_new])
                     trans=self.Trans+Vec3D.Vec3D(trans[0],trans[1],trans[2])
 
@@ -2828,7 +2828,7 @@ class Hellipse(Damage):
                                         self.TRotation)
                     a_new=b
                     b_new=a+y0_new
-                    trans=Numeric.dot(self.TRotation, \
+                    trans=np.dot(self.TRotation, \
                                       [0.0,y0_new,z0_new])
                     trans=self.Trans+Vec3D.Vec3D(trans[0],trans[1],trans[2])
                     dam_el = self.__HtoQ(a_new,b_new,trans,norm)
@@ -2907,7 +2907,7 @@ class Hellipse(Damage):
         # loop over gp9 and sum
         nsum=0
 
-        for i in xrange(len(gp9)):
+        for i in range(len(gp9)):
             ri = phi_1+(phi_2-phi_1)*(gp9[i]+1.0)/2.0
             wi = gw9[i]
             y = arc(ri) # arc is the lambda defined above
@@ -2927,7 +2927,7 @@ class Hellipse(Damage):
 
         # phi_L
         y,z=self.__yzfunc(a,b,rho,phi_L)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -2937,7 +2937,7 @@ class Hellipse(Damage):
 
         # phi_H
         y,z=self.__yzfunc(a,b,rho,phi_H)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -2948,7 +2948,7 @@ class Hellipse(Damage):
         while abs(phi_H-phi_L) > tol:
             phi_M=0.5*(phi_H+phi_L)
             y,z=self.__yzfunc(a,b,rho,phi_M)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -2978,7 +2978,7 @@ class Hellipse(Damage):
 
         # phi_L
         y,z=self.__yzfunc(a,b,rho_L,phi)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -2988,7 +2988,7 @@ class Hellipse(Damage):
 
         # phi_H
         y,z=self.__yzfunc(a,b,rho_H,phi)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -2999,7 +2999,7 @@ class Hellipse(Damage):
         while abs(rho_H-rho_L) > tol:
             rho_M=0.5*(rho_H+rho_L)
             y,z=self.__yzfunc(a,b,rho_M,phi)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -3054,23 +3054,23 @@ class Hellipse(Damage):
             
             if a == b:
                 e = 0.0
-                r = a*((1-e*e)/(1-e*e*Numeric.cos(theta)* \
-                                Numeric.cos(theta)))**.5
-                phi=(2/Numeric.pi)*Numeric.arccos((r/a)* \
-                                                   Numeric.cos(theta))-1.0
+                r = a*((1-e*e)/(1-e*e*np.cos(theta)* \
+                                np.cos(theta)))**.5
+                phi=(2/np.pi)*np.arccos((r/a)* \
+                                                   np.cos(theta))-1.0
             elif a > b:
                 e = (1-b*b/a/a)**.5
-                r = a*((1-e*e)/(1-e*e*Numeric.cos(theta)* \
-                                Numeric.cos(theta)))**.5
-                phi=(2/Numeric.pi)*Numeric.arccos((r/a)* \
-                                                   Numeric.cos(theta))-1.0
+                r = a*((1-e*e)/(1-e*e*np.cos(theta)* \
+                                np.cos(theta)))**.5
+                phi=(2/np.pi)*np.arccos((r/a)* \
+                                                   np.cos(theta))-1.0
             else:
                 a,b = b,a
                 e = (1-b*b/a/a)**.5
-                r = a*((1-e*e)/(1-e*e*Numeric.cos(theta)* \
-                                Numeric.cos(theta)))**.5
-                phi=(2/Numeric.pi)*Numeric.arccos((r/a)* \
-                                            Numeric.cos(theta))-1.0
+                r = a*((1-e*e)/(1-e*e*np.cos(theta)* \
+                                np.cos(theta)))**.5
+                phi=(2/np.pi)*np.arccos((r/a)* \
+                                            np.cos(theta))-1.0
                 a,b = b,a
             PhiList += [phi]
         PhiList.sort()
@@ -3093,7 +3093,7 @@ class Hellipse(Damage):
         # -1.0
         for phi in PhiList:
             y,z=self.__yzfunc(a,b,1.0,phi-0.01)
-            u=Numeric.dot(self.TRotation,[0.0,y,z])
+            u=np.dot(self.TRotation,[0.0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             # note, dialed-up the tolerance in FemModel.element.PointInside!
             (flag,dist)=self.PointOutside(qpnt,self.model)
@@ -3121,7 +3121,7 @@ class Hellipse(Damage):
         '''
 
         # begin the search with the increment handed to __CheckPnts
-        for i in xrange(3):
+        for i in range(3):
             PhiList=[]; CheckList=[]
             phi_L,phi_H,flag = self.__InOrOut(self.model,-1.1,inc)
 
@@ -3156,7 +3156,7 @@ class Hellipse(Damage):
         # get stress at each guass point
         for y in ypnts:
             for z in zpnts:
-                #u=Numeric.dot(self.TRotation,[0,y,z])
+                #u=np.dot(self.TRotation,[0,y,z])
                 #qpnt=center+Vec3D.Vec3D(u[0],u[1],u[2])
                 u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
                 u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
@@ -3184,8 +3184,8 @@ class Hellipse(Damage):
         sigG=[[sig.xx(), sig.xy(), sig.zx()],
               [sig.xy(), sig.yy(), sig.yz()],
               [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=Numeric.dot(self.Rotation,sigG)
-        #sigL=Numeric.dot(R_sigG,self.TRotation)
+        #R_sigG=np.dot(self.Rotation,sigG)
+        #sigL=np.dot(R_sigG,self.TRotation)
         #f+=[sigL[0][0]]
         f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
             +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
@@ -3193,9 +3193,9 @@ class Hellipse(Damage):
         XY+=[[0.0, 1]]
 
         # Solve the least squares problem
-        XYTXY=Numeric.dot(Numeric.transpose(XY),XY)
-        XYTf=Numeric.dot(Numeric.transpose(XY),f)
-        coef=LinearAlgebra.solve_linear_equations(XYTXY,XYTf)
+        XYTXY=np.dot(np.transpose(XY),XY)
+        XYTf=np.dot(np.transpose(XY),f)
+        coef=np.linalg.solve(XYTXY,XYTf)
         return coef
 
 ######## Hellipse
@@ -3228,7 +3228,7 @@ class Hellipse(Damage):
 
         # check the phi_in first
         y,z=self.__yzfunc(a,b,1.0,phi_in)
-        u=Numeric.dot(self.TRotation,[0.0,y,z])
+        u=np.dot(self.TRotation,[0.0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         
         # FemModel.IsPointIn() returns 1 if point is inside the mesh and 0 if
@@ -3248,7 +3248,7 @@ class Hellipse(Damage):
             flag=switch
             phi_in+=inc # incrementally increase phi_in
             y,z=self.__yzfunc(a,b,1.0,phi_in)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -3282,7 +3282,7 @@ class Hellipse(Damage):
 
         '''
 
-        RANGE=range(3)
+        RANGE=list(range(3))
 
         if Ki == 4: return 4
 
@@ -3300,7 +3300,7 @@ class Hellipse(Damage):
 ##        for i in xrange(5):
 ##            phi=float(i)/2.0 - 1.0
 ##            y,z=self.__yzfunc(a,b,1.0,phi)
-##            u=Numeric.dot(self.TRotation,[0,y,z])
+##            u=np.dot(self.TRotation,[0,y,z])
 ##            qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##            (flag,dist)=self.PointOutside(qpnt,self.model)
 ##            if flag == 1:
@@ -3351,13 +3351,13 @@ class Hellipse(Damage):
         self.Trans = center # location of cntr, update as necessary. 
                           # original center is always retrievable by
                           # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid) 
-        self.dN=[] # list of time steps Numeric.sum(self.dN) = Life
+        self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
 
         # initiate the dadN model & store material to pass to Qellipse
         self.material = material
-        self.dadN=[dadN.dadN(material,1),dadN.dadN(material,0), \
-                   dadN.dadN(material,1)]
+        self.dadN=[MydadN.Willenborg(material,1),MydadN.Willenborg(material,0), \
+                   MydadN.Willenborg(material,1)]
         # initialize the plastic zone size
         for i in range(self.CrackFrontPoints): self.dadN[i].SetKol()
 
@@ -3390,14 +3390,14 @@ class Hellipse(Damage):
 ##                       [1.0, 0.0, 0.0],
 ##                       [0.0, 0.0, -1.0]]
 
-        # store transpose(self.Rotation) to reduce calls to Numeric.Transpose
-        self.TRotation = Numeric.transpose(self.Rotation)
+        # store transpose(self.Rotation) to reduce calls to np.Transpose
+        self.TRotation = np.transpose(self.Rotation)
 
         if verification:
             self.verification=True
-            print self
-            print ' ',self.names[0], ' Rotation matrix is:'
-            print repr(Numeric.array(self.Rotation))+"\n"
+            print(self)
+            print((' ',self.names[0], ' Rotation matrix is:'))
+            print((repr(np.array(self.Rotation))+"\n"))
 
 ######## Hellipse
 
@@ -3418,7 +3418,7 @@ class Hellipse(Damage):
         size - a list of ellipses dimensions: [a, b, -a, -b]
         args - tuple of supporting arguments, in this case just scale! 
         '''
-        RANGE=range(3)
+        RANGE=list(range(3))
         # unpack args
 ##        print 'in dAdN', N, size
         scale=args[0]
@@ -3426,7 +3426,7 @@ class Hellipse(Damage):
         abab= [max(0,size[i]) for i in RANGE]
         a,b = (abab[0]+abab[2])/2.0 ,abab[1]
         Xell = (abab[0]-abab[2])/2.0
-        trans=Numeric.dot(self.TRotation, \
+        trans=np.dot(self.TRotation, \
                       [0.0,Xell,0.0])
         localcenter=self.Trans + Vec3D.Vec3D(trans[0],trans[1],trans[2])
 ##        print 'before'
@@ -3436,7 +3436,7 @@ class Hellipse(Damage):
             growth.append(self.dadN[i].Calc_dadN(KIs[i],size[i],int(N)))
 
         if max(growth) <= 0.:
-            raise DamErrors.dAdNError, ('Hellipse',\
+            raise DamErrors.dAdNError('Hellipse',\
                                   'All growth rates <= 0.0',growth)
         return growth
 
@@ -3483,7 +3483,7 @@ class Qellipse(Damage):
             Ki=self.__CalculateKi(a,b,self.Trans,scale)
             return Ki 
 
-        except DamErrors.FitPolyError, message:
+        except DamErrors.FitPolyError as message:
             # for cases where the crack grows well outside the model,
             # model.GetPtStress returns 'point not in any elements'.  This is
             # flagged in __FitPoly and the K's are set to -10 (integer).  If 
@@ -3491,9 +3491,9 @@ class Qellipse(Damage):
             # than the next elif where i check list because that checks if the
             # entire crack is outside the mesh.
             if self.verbose:
-                print ' FitPoly dumped for', message[0], 'at doid', self.doid,\
-                      'due to',message[1] 
-                print '** SIMULATION OK, means crack has out grown its welcome'
+                print((' FitPoly dumped for', message[0], 'at doid', self.doid,\
+                      'due to',message[1])) 
+                print('** SIMULATION OK, means crack has out grown its welcome')
             # remove the last stuff in DamHistory because we couldn't compute
             # corresponding K's.
             return 4
@@ -3535,10 +3535,10 @@ class Qellipse(Damage):
 
         try:
             coef=self.__FitPolynomial(c,a,center)
-        except MeshTools.EmptySearchResult, message:
-            raise DamErrors.FitPolyError, ('Qellipse',message)
-        except LinearAlgebra.LinAlgError, message:
-            raise DamErrors.FitPolyError, ('Qellipse',message)
+        except MeshTools.EmptySearchResult as message:
+            raise DamErrors.FitPolyError('Qellipse',message)
+        except np.linalg.LinAlgError as message:
+            raise DamErrors.FitPolyError('Qellipse',message)
 
         # sigma_normal = A*z + B (eqn. of a line)
         A=coef[0]
@@ -3647,7 +3647,7 @@ class Qellipse(Damage):
             a_his = open(path_name+'''.a''', 'a')
             b_his = open(path_name+'''.b''', 'a')
             dN = open(path_name+'''.dN''', 'a')
-            for i in xrange(len(self.DamHistory[0])):
+            for i in range(len(self.DamHistory[0])):
                 a_his.write(str(did)+' '+str(self.DamHistory['ab'][i][0])+  \
                                      ' '+str(self.DamHistory[0][i])+"\n")
                 b_his.write(str(did)+' '+str(self.DamHistory['ab'][i][1])+  \
@@ -3708,7 +3708,7 @@ class Qellipse(Damage):
         # loop over gp9 and sum
         nsum=0
 
-        for i in xrange(len(gp9)):
+        for i in range(len(gp9)):
             ri = phi_1+(phi_2-phi_1)*(gp9[i]+1.0)/2.0
             wi = (phi_2-phi_1)*(gw9[i])/2
             y = arc(ri) # arc is the lambda defined above
@@ -3728,7 +3728,7 @@ class Qellipse(Damage):
 
         # phi_L
         y,z=self.__yzfunc(a,b,rho,phi_L)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -3738,7 +3738,7 @@ class Qellipse(Damage):
 
         # phi_H
         y,z=self.__yzfunc(a,b,rho,phi_H)
-        u=Numeric.dot(self.TRotation,[0,y,z])
+        u=np.dot(self.TRotation,[0,y,z])
         qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
         (flag,dist)=self.PointOutside(qpnt,self.model)
         if flag == 1:
@@ -3749,7 +3749,7 @@ class Qellipse(Damage):
         while abs(phi_H-phi_L) > tol:
             phi_M=0.5*(phi_H+phi_L)
             y,z=self.__yzfunc(a,b,rho,phi_M)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
             (flag,dist)=self.PointOutside(qpnt,self.model)
             if flag == 1:
@@ -3780,7 +3780,7 @@ class Qellipse(Damage):
         # get stress at each guass point
         for y in ypnts:
             for z in zpnts:
-                #u=Numeric.dot(self.TRotation,[0,y,z])
+                #u=np.dot(self.TRotation,[0,y,z])
                 u0=self.Rotation[1][0]*y+self.Rotation[2][0]*z
                 u1=self.Rotation[1][1]*y+self.Rotation[2][1]*z
                 u2=self.Rotation[1][2]*y+self.Rotation[2][2]*z
@@ -3793,8 +3793,8 @@ class Qellipse(Damage):
                       [sig.xy(), sig.yy(), sig.yz()],
                       [sig.zx(), sig.yz(), sig.zz()]]
                 # sigL = R*sigG*R'
-                #R_sigG=Numeric.dot(self.Rotation,sigG)
-                #sigL=Numeric.dot(R_sigG,self.TRotation)
+                #R_sigG=np.dot(self.Rotation,sigG)
+                #sigL=np.dot(R_sigG,self.TRotation)
 
                 # fill matrix and right-hand-side vector
                 #f+=[sigL[0][0]]
@@ -3807,8 +3807,8 @@ class Qellipse(Damage):
         sigG=[[sig.xx(), sig.xy(), sig.zx()],
               [sig.xy(), sig.yy(), sig.yz()],
               [sig.zx(), sig.yz(), sig.zz()]]
-        #R_sigG=Numeric.dot(self.Rotation,sigG)
-        #sigL=Numeric.dot(R_sigG,self.TRotation)
+        #R_sigG=np.dot(self.Rotation,sigG)
+        #sigL=np.dot(R_sigG,self.TRotation)
         #f+=[sigL[0][0]]
         f+=[A*A*sig.xx() + B*B*sig.yy() + C*C*sig.zz() \
             +2.0*A*B*sig.xy()+2.0*A*C*sig.zx()+2.0*B*C*sig.yz()]
@@ -3816,9 +3816,9 @@ class Qellipse(Damage):
 
         # solve the linear least squares problem (method of normal equations)
         XYTXY=0.; XYTf=0.
-        XYTXY=Numeric.dot(Numeric.transpose(XY),XY)
-        XYTf=Numeric.dot(Numeric.transpose(XY),f)
-        coef=LinearAlgebra.solve_linear_equations(XYTXY,XYTf)
+        XYTXY=np.dot(np.transpose(XY),XY)
+        XYTf=np.dot(np.transpose(XY),f)
+        coef=np.linalg.solve(XYTXY,XYTf)
 
         return coef
 
@@ -3844,7 +3844,7 @@ class Qellipse(Damage):
             x3=Vec3D.Vec3D(self.Rotation[1][0],self.Rotation[1][1],\
                            self.Rotation[1][2])
             x1=Vec3D.CrossProd(x2,x3).Normalize()
-            self.Rotation=Numeric.array([[x1.x(), x1.y(), x1.z()],
+            self.Rotation=np.array([[x1.x(), x1.y(), x1.z()],
                                          [x2.x(), x2.y(), x2.z()],
                                          [x3.x(), x3.y(), x3.z()]])
 
@@ -3863,7 +3863,7 @@ class Qellipse(Damage):
 
         # check the phi_in first
         y,z=self.__yzfunc(a,b,1.0,phi_in)
-        u=Numeric.dot(self.TRotation,[0.0,y,z])
+        u=np.dot(self.TRotation,[0.0,y,z])
         qpnt=self.DamOro+Vec3D.Vec3D(u[0],u[1],u[2])
 
         # FemModel.IsPointIn() returns 1 if point is inside the mesh and 0 if
@@ -3879,7 +3879,7 @@ class Qellipse(Damage):
             flag=switch
             phi_in+=inc # incrementally increase phi_in
             y,z=self.__yzfunc(a,b,1.0,phi_in)
-            u=Numeric.dot(self.TRotation,[0,y,z])
+            u=np.dot(self.TRotation,[0,y,z])
             qpnt=self.DamOro+Vec3D.Vec3D(u[0],u[1],u[2])
             switch,eid,eclass,coords,dist=self.model.IsPointIn(qpnt)
 
@@ -3904,7 +3904,7 @@ class Qellipse(Damage):
         thickness, t, that will be hard to estimate here.  
         '''
 
-        RANGE=range(2)
+        RANGE=list(range(2))
 
         if Ki == 4: return 4
 
@@ -3919,7 +3919,7 @@ class Qellipse(Damage):
 ##        for i in range(5):
 ##            phi=float(i)/2.0 - 1.0
 ##            y,z=self.__yzfunc(a,b,1.0,phi)
-##            u=Numeric.dot(self.TRotation,[0,y,z])
+##            u=np.dot(self.TRotation,[0,y,z])
 ##            qpnt=self.Trans+Vec3D.Vec3D(u[0],u[1],u[2])
 ##            (flag,dist)=self.PointOutside(qpnt,self.model)
 ##            if flag == 1:
@@ -3970,11 +3970,11 @@ class Qellipse(Damage):
         self.Trans = center # location of cntr, update as necessary. 
                           # original center is always retrievable by
                           # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid) 
-        self.dN=[] # list of time steps Numeric.sum(self.dN) = Life
+        self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
 
         # initiate dadN model ** don't bother storing material as attribute! 
-        self.dadN=[dadN.dadN(material,1),dadN.dadN(material,1)]
+        self.dadN=[MydadN.Willenborg(material,1),MydadN.Willenborg(material,1)]
         # initialize the plastic zone size
         for i in range(self.CrackFrontPoints): self.dadN[i].SetKol()
 
@@ -3998,7 +3998,7 @@ class Qellipse(Damage):
         # coords to the coordinate system of the quarter ellipse.
         # A'= r R A Rt rt (Rt is R transpose)
         # so self.Rotation = rR ...
-        self.Rotation=Numeric.dot(r,self.Rotation)
+        self.Rotation=np.dot(r,self.Rotation)
 
         # Raju & Newman's solution for a quarter ellipse in a plate with 
         # dimensions w * h * t, expects 'a' to be on w face and 'b' to be in
@@ -4007,14 +4007,14 @@ class Qellipse(Damage):
         # changes self.Rotation so that 'b' is assigned the shortest direction
         self.__FixRotation()
 
-        # store transpose(self.Rotation) to reduce calls to Numeric.Transpose
-        self.TRotation = Numeric.transpose(self.Rotation)
+        # store transpose(self.Rotation) to reduce calls to np.Transpose
+        self.TRotation = np.transpose(self.Rotation)
 
         if verification:
             self.verification=True
-            print self
-            print ' ',self.names[0], ' Rotation matrix is:'
-            print repr(Numeric.array(self.Rotation))+"\n"
+            print(self)
+            print((' ',self.names[0], ' Rotation matrix is:'))
+            print((repr(np.array(self.Rotation))+"\n"))
 
 ######## Qellipse
 
@@ -4035,7 +4035,7 @@ class Qellipse(Damage):
         size - a list of ellipses dimensions: [a, b, -a, -b]
         args - tuple of supporting arguments, in this case just scale! 
         '''
-        RANGE=range(2)
+        RANGE=list(range(2))
         # unpack args
         scale=args[0]
         growth = []
@@ -4045,7 +4045,7 @@ class Qellipse(Damage):
             growth.append(self.dadN[i].Calc_dadN(KIs[i],size[i],int(N)))
 
         if max(growth) <= 0.:
-            raise DamErrors.dAdNError, ('Qellipse',\
+            raise DamErrors.dAdNError('Qellipse',\
                                   'All growth rates <= 0.0',growth)
         return growth
 
@@ -4086,9 +4086,9 @@ def TwoBricks():
 
     cwd=os.getcwd()
 
-    print 'calling meshtools'
+    print('calling meshtools')
     model=MeshTools.MeshTools(cwd+"\\check",'RDB')
-    print 'meshtools was successfull'
+    print('meshtools was successfull')
     os.system("del check.*")
 
     return model
@@ -4135,9 +4135,9 @@ def OneTet2I():
 
     cwd=os.getcwd()
 
-    print 'calling meshtools'
+    print('calling meshtools')
     model=MeshTools.MeshTools(cwd+"\\check",'RDB')
-    print 'meshtools was successfull'
+    print('meshtools was successfull')
     os.system("del check.*")
 
     return model
@@ -4156,7 +4156,7 @@ if __name__=="__main__":
 ##    print model.GetPtStress(Vec3D.Vec3D(0.25,0.25,0.25))
 
     blah=Fellipse(8,Vec3D.Vec3D(0,0,0),model,0.1,0.1,material)
-    print blah
+    print(blah)
 
 
 

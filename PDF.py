@@ -1,6 +1,7 @@
 import MydadN, Statistic
-import dadN
-import pylab, math, sys, os, string, Numeric, copy
+from matplotlib import pylab
+import math, sys, os, copy
+import numpy as np
 import JohnsVectorTools as JVT
 
 
@@ -31,19 +32,19 @@ def CondProb(Nlist,n,ncrlist):
 
 def PlotReliability(N,samples,Nmax,color,lab,ncrlist,no_broken_particles):
 
-    nodes=N.keys()
+    nodes=list(N.keys())
     numnodes=float(len(nodes))
     ncrlist=ncrlist.tolist()
     ncrlist[-1]=ncrlist[-1]+100.0
 
     total_broken_parts=0
-    for statns in N.values(): total_broken_parts+=statns.samples
+    for statns in list(N.values()): total_broken_parts+=statns.samples
 
     P=pylab.zeros(len(ncrlist),dtype=float)
     P=P.tolist()
     one=pylab.ones(len(ncrlist),dtype=float)
     for nid in nodes:
-        p=CondProb(N[nid].rv[0].values(),samples,ncrlist)
+        p=CondProb(list(N[nid].rv[0].values()),samples,ncrlist)
         if len(no_broken_particles) == 0:
             P=JVT.Plus(P,JVT.Star(p,JVT.ScalarMult(one,1.0/numnodes)))
         else:
@@ -65,14 +66,14 @@ def PlotReliability(N,samples,Nmax,color,lab,ncrlist,no_broken_particles):
 def PlotWeibull(R,ncrlist,color,lab,Nstar):
 
     # can't log(zero)... so log(log(1.0)) has to be avoided
-    a=Numeric.less(R,1.0)
+    a=np.less(R,1.0)
     a=a.tolist()
     index=a.index(1)
     R=R[index:]
     ncrlist=ncrlist[index:]
 
     # can't log(zero)... so remove zero reliability
-    a=Numeric.greater(R,0.)
+    a=np.greater(R,0.)
     a=a.tolist()
     try:
         index=a.index(0)
@@ -96,7 +97,7 @@ def PlotWeibull(R,ncrlist,color,lab,Nstar):
 
 def PlotHistOfA(ai,color,norm):
     pylab.axes([0.15,0.2,0.7,0.7])
-    pylab.hist(ai.rv[0].keys(),normed=norm,align='center',bins=100,fc=color)
+    pylab.hist(list(ai.rv[0].keys()),density=norm,align='center',bins=100,fc=color)
     pylab.xticks(size=18,rotation=45)
     pylab.yticks(size=18)
 
@@ -109,7 +110,7 @@ def Populaternd(rndname):
     ai = Statistic.Stata(1,len(b))
     ai.UpdateSet()
     for line in b:
-        stuff=string.splitfields(line)
+        stuff=line.split()
         if stuff: ai.UpdateSamples(float(stuff[1]),0,int(stuff[0]))
 
     return ai
@@ -131,9 +132,9 @@ def PopulateN(Nname):
     b=f.readlines()
     N = {}; no_broken_particles=[]
     for line in b:
-        stuff=string.splitfields(line)
+        stuff=line.split()
         if stuff: 
-            if N.has_key(int(stuff[0])):
+            if int(stuff[0]) in N:
                 N[int(stuff[0])].UpdateSamples(float(stuff[2]),0,int(stuff[1]))
             else:
                 N[int(stuff[0])]=Statistic.StatN(1,'dynamic')
@@ -147,19 +148,19 @@ def PopulateN(Nname):
 ########################################################
 
 def HelpPrints():
-    print " " 
-    print " code to plot the cummulative probability of failure & a histogram"
-    print " of the initial particles (flaw) radii"  
-    print " ---- " 
-    print " Arguments are:"
-    print " ...>Prob_plot.py -rnd [list of rnd filenames] -N [list N filenames]"
-    print "  *** the way i wrote it, the order matters... do -rnd first!"
-    print " "
-    print " rnd file has format:"
-    print "     rid ai"
-    print " N file has format:"
-    print "     nid rid N"
-    print "      --> if rid = -1, no cracks grew."
+    print(" ") 
+    print(" code to plot the cummulative probability of failure & a histogram")
+    print(" of the initial particles (flaw) radii")  
+    print(" ---- ") 
+    print(" Arguments are:")
+    print(" ...>Prob_plot.py -rnd [list of rnd filenames] -N [list N filenames]")
+    print("  *** the way i wrote it, the order matters... do -rnd first!")
+    print(" ")
+    print(" rnd file has format:")
+    print("     rid ai")
+    print(" N file has format:")
+    print("     nid rid N")
+    print("      --> if rid = -1, no cracks grew.")
 
     sys.exit()
 
@@ -180,7 +181,7 @@ if __name__=="__main__":
 
     except: HelpPrints()
 
-    print ' '
+    print(' ')
 
     Nmax=1e5
     Nstar=1.0 # for weibull x-axis --> Ln(x/x*) 
@@ -201,13 +202,13 @@ if __name__=="__main__":
         colline=colorlinestyle[i]
         label=labels[i]
 
-        print rndname,Nname
+        print(rndname,Nname)
 
         ai = Populaternd(rndname)
-        samples=len(ai.rid_ai.keys())
+        samples=len(list(ai.rid_ai.keys()))
         samples = 10000
         N,no_broken_particles = PopulateN(Nname) 
-        nids=N.keys()
+        nids=list(N.keys())
 
         # i want to compute total probs correctly.  for particle filter the
         # prob of occurence of a flaw is:

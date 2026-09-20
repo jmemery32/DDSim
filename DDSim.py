@@ -1,11 +1,11 @@
-import sys, time, string
+import sys, time
 import MeshTools
 import DamMo as DamModel
 import VarAmplitude
 import Parameters
 import Vec3D, ColTensor 
-import numpy as Numeric
-import math, os, cPickle, random
+import numpy as np
+import math, os, pickle, random
 import Statistic # for plotting cdf of ai's.
 
 # verification flag --> makes some things print automatically
@@ -17,67 +17,67 @@ def HelpPrints():
     function to print some help for the various switches.
     ''' 
 
-    print ' '
-    print '         DDSim command line arguments.'
-    print ' The various command line switches are...'
-    print ' -base -> follow by base file name.  Overrides further prompting'
-    print '          for file name.'
-    print ' -conpath -> if specify -base, include -conpath if necessary (i.e. '
-    print '          if input files are not in current working directory.) One'
-    print '          would never provide -conpath but not -base.  However, '
-    print '          -base may be specified without -conpath'
-    print '          eg.  ...>DDSim.py -base <filename> -conpath <path>'
-    print '          eg.  ...>DDSim.py -base example1   -conpath examples\\'
-    print ' -parpath -> same usage as above, location of *.par file'
-    print ' -eg   -> process example1 (no further input necessary) '
-    print ' -o    -> to be prompted for output options'
-    print " -pa   -> means we just want it to print all results."
-    print " -pdid -> print the damage elements (DamHistory)."
-    print " -pdoid -> print the damage origin results."
-    print ' -v    -> print damage results as they process'
+    print(' ')
+    print('         DDSim command line arguments.')
+    print(' The various command line switches are...')
+    print(' -base -> follow by base file name.  Overrides further prompting')
+    print('          for file name.')
+    print(' -conpath -> if specify -base, include -conpath if necessary (i.e. ')
+    print('          if input files are not in current working directory.) One')
+    print('          would never provide -conpath but not -base.  However, ')
+    print('          -base may be specified without -conpath')
+    print('          eg.  ...>DDSim.py -base <filename> -conpath <path>')
+    print('          eg.  ...>DDSim.py -base example1   -conpath examples\\')
+    print(' -parpath -> same usage as above, location of *.par file')
+    print(' -eg   -> process example1 (no further input necessary) ')
+    print(' -o    -> to be prompted for output options')
+    print(" -pa   -> means we just want it to print all results.")
+    print(" -pdid -> print the damage elements (DamHistory).")
+    print(" -pdoid -> print the damage origin results.")
+    print(' -v    -> print damage results as they process')
     # -sv doesn't do anything right now... output.n and.sif are save
     # automatically with -DB option... 
 ##    print ' -sv   -> save output.N, output.SIF text files'
-    print ' -sp   -> save pickled N file and .ori, .ai, .af files'
-    print ' -sc   -> save files for viewing contours w/ MAP (*.MP)'
-    print ' -si   -> save intermediate files of N for each doid as processed'
-    print '         (not for parallel jobs, must include subdirectory \\inter)'
-    print ' -L    -> limit the simulation spatially (will prompt for limits)'
-    print ' -S    -> limit the simulation to surface nodes only'
-    print ' -p    -> parallel job (include jobname.bat file in job directory)'
-    print ' -usa  -> means use a user supplied ais by *.rnd file (binary no '
-    print '          longer supported!)'
-    print ' -DB   -> means a parallel run from SQL where the random initial '
-    print '          crack sizes are supplied by the database'
-    print ' -doid_list -> to specify node ids to run ddsim for.  Use #,# '
-    print '               i.e. comma, no spaces! '
-    print ' -pick_list -> to specify a pickled list of doids.  Follow key with'
-    print '               filename.extentions'
-    print ' '
-    print " Integrations: Default is Constant amplitude, Adaptive time step,"
-    print " RK-5" 
-    print ' -Fwd  --> Constant amplitude, forward euler'
-    print ' -RK4  --> Constand amplitude, 4 point RK scheme'
-    print " -Simp --> Constant amplitude, Simpson's rule on generated SIF "
-    print "           history"
-    print " -VarAmp -> Variable amplitude loading, cycle-by-cycle integration"
-    print "            Should be followed by the amplitude history file name. "
-    print ' '
-    print " -scale -> A multiplier for K values to scale stress if necessary."
-    print "           Should be followed with an float greater than 0."
-    print " -seed -> a seed to generate the monte samples with. "
-    print "          Should be followed with a number."
-    print " -nore -> specify to prevent the use of the Willenborg retardation"
-    print "          model. i.e. growth rate is given by NASGRO eqn w/o "
-    print "          retardation effects."
-    print " -verify -> to print diagnostic info to the screen."
-    print " -DebugGeomUtils -> to make create a file that our script to test "
-    print "                  GeomUtils can read.  Follow key (-DebugGeomUtils)"
-    print "                  by string to indicate name and location of file."
-    print " -SVIEW <filename> -> to write an sview file.  Follow key with "
-    print "           string to indicate name and location of sview file. "
-    print " -cf -> prints crack front points to a file named <filename>.front"
-    print "        ONLY use this for single doid runs."
+    print(' -sp   -> save pickled N file and .ori, .ai, .af files')
+    print(' -sc   -> save files for viewing contours w/ MAP (*.MP)')
+    print(' -si   -> save intermediate files of N for each doid as processed')
+    print('         (not for parallel jobs, must include subdirectory \\inter)')
+    print(' -L    -> limit the simulation spatially (will prompt for limits)')
+    print(' -S    -> limit the simulation to surface nodes only')
+    print(' -p    -> parallel job (include jobname.bat file in job directory)')
+    print(' -usa  -> means use a user supplied ais by *.rnd file (binary no ')
+    print('          longer supported!)')
+    print(' -DB   -> means a parallel run from SQL where the random initial ')
+    print('          crack sizes are supplied by the database')
+    print(' -doid_list -> to specify node ids to run ddsim for.  Use #,# ')
+    print('               i.e. comma, no spaces! ')
+    print(' -pick_list -> to specify a pickled list of doids.  Follow key with')
+    print('               filename.extentions')
+    print(' ')
+    print(" Integrations: Default is Constant amplitude, Adaptive time step,")
+    print(" RK-5") 
+    print(' -Fwd  --> Constant amplitude, forward euler')
+    print(' -RK4  --> Constand amplitude, 4 point RK scheme')
+    print(" -Simp --> Constant amplitude, Simpson's rule on generated SIF ")
+    print("           history")
+    print(" -VarAmp -> Variable amplitude loading, cycle-by-cycle integration")
+    print("            Should be followed by the amplitude history file name. ")
+    print(' ')
+    print(" -scale -> A multiplier for K values to scale stress if necessary.")
+    print("           Should be followed with an float greater than 0.")
+    print(" -seed -> a seed to generate the monte samples with. ")
+    print("          Should be followed with a number.")
+    print(" -nore -> specify to prevent the use of the Willenborg retardation")
+    print("          model. i.e. growth rate is given by NASGRO eqn w/o ")
+    print("          retardation effects.")
+    print(" -verify -> to print diagnostic info to the screen.")
+    print(" -DebugGeomUtils -> to make create a file that our script to test ")
+    print("                  GeomUtils can read.  Follow key (-DebugGeomUtils)")
+    print("                  by string to indicate name and location of file.")
+    print(" -SVIEW <filename> -> to write an sview file.  Follow key with ")
+    print("           string to indicate name and location of sview file. ")
+    print(" -cf -> prints crack front points to a file named <filename>.front")
+    print("        ONLY use this for single doid runs.")
     
 
 #############
@@ -100,7 +100,7 @@ def LocalNodeInitializeStuff(model,extension,parameters):
         ais.UpdateSet()
         for j in range(parameters.samples):
             l=tfile.readline()
-            l=string.splitfields(l)
+            l=l.split()
             ais.UpdateSamples(float(l[1]),i,int(l[0]))
     tfile.close()
 
@@ -111,11 +111,11 @@ def LocalNodeInitializeStuff(model,extension,parameters):
         ais_map={}
         tfilelist=tfile.readlines()
         for line in tfilelist:
-            l = string.splitfields(line)
-            ais_map[int(l[0])]=map(int,l[2:])
+            l = line.split()
+            ais_map[int(l[0])]=list(map(int,l[2:]))
         tfile.close()
 
-    ncr=Numeric.arange(0,parameters.N_max*1.01,1000)
+    ncr=np.arange(0,parameters.N_max*1.01,1000)
     ncr=ncr.tolist()
 
     return doid_list,node_list,ais,ncr,ais_map
@@ -145,7 +145,7 @@ def ParallelInitializeStuff(model,doid_range,surface,seed,parameters):
         tfile=open(filename+'.rnd','w')
         s=''
         for diction in ais.rv:
-            for ai in diction.keys():
+            for ai in list(diction.keys()):
                 for rid in diction[ai]:
                     s+=str(rid)+' '+str(ai)+"\n"
 ##                print s
@@ -176,7 +176,7 @@ def DataBaseInitializeStuff(model,extension,parameters):
         ais.UpdateSet()
         for j in range(parameters.samples):
             l=tfile.readline()
-            l=string.splitfields(l)
+            l=l.split()
             ais.UpdateSamples(float(l[1]),i,int(l[0]))
     tfile.close()
 
@@ -187,11 +187,11 @@ def DataBaseInitializeStuff(model,extension,parameters):
         ais_map={}
         tfilelist=tfile.readlines()
         for line in tfilelist:
-            l = string.splitfields(line)
-            ais_map[int(l[0])]=map(int,l[2:])
+            l = line.split()
+            ais_map[int(l[0])]=list(map(int,l[2:]))
         tfile.close()
 
-    ncr=Numeric.arange(0,parameters.N_max*1.01,1000)
+    ncr=np.arange(0,parameters.N_max*1.01,1000)
     ncr=ncr.tolist()
 
     return doid_list,node_list,ais,ncr,ais_map
@@ -209,7 +209,7 @@ def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
         index=sys.argv.index('-doid_list')+1 # to skip '('
         doid_list=[]
         entry=sys.argv[index]
-        dlist=string.splitfields(entry,',')
+        dlist=entry.split(',')
         for dd in dlist: doid_list+=[int(dd)]
 
     elif pickled_list:
@@ -240,7 +240,7 @@ def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
                     ais.UpdateSet()
                     for j in range(parameters.samples):
                         l=tfile.readline()
-                        l=string.splitfields(l)
+                        l=l.split()
                         ais.UpdateSamples(float(l[1]),i,int(l[0]))
                 tfile.close()
             else:
@@ -255,7 +255,7 @@ def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
                 ais.UpdateSet()
                 for j in range(parameters.samples):
                     l=tfile.readline()
-                    l=string.splitfields(l)
+                    l=l.split()
                     ais.UpdateSamples(float(l[1]),i,int(l[0]))
             tfile.close()
 
@@ -266,17 +266,17 @@ def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
                 ais_map={}
                 tfilelist=tfile.readlines()
                 for line in tfilelist:
-                    l = string.splitfields(line)
-                    ais_map[int(l[0])]=map(int,l[2:])
+                    l = line.split()
+                    ais_map[int(l[0])]=list(map(int,l[2:]))
                 tfile.close()
 
         # create the list of critical life values used to compute probabilities
         if default == 1 or example == 1 or base == 1:
-            ncr=Numeric.arange(0,parameters.N_max*1.01,1000)
+            ncr=np.arange(0,parameters.N_max*1.01,1000)
             ncr=ncr.tolist()
         else:
             min_ncr,max_ncr,space = GetSatisfied(GetncrRange)
-            ncr=Numeric.arange(min_ncr,max_ncr,space)
+            ncr=np.arange(min_ncr,max_ncr,space)
             ncr=ncr.tolist()
 
     return doid_list,node_list,ais,ncr,ais_map
@@ -307,24 +307,24 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
         # Calc number of iterations to meet max crack size (user specified)
         # (r^n)*a=a_max
         # add 2 so that if changes damage type still gets to a_max
-        iters = Numeric.log(parameters.Max_crack_size/a)/ \
-                Numeric.log(parameters.r)
-        iters = int(Numeric.ceil(iters))+2
+        iters = np.log(parameters.Max_crack_size/a)/ \
+                np.log(parameters.r)
+        iters = int(np.ceil(iters))+2
 
     # Build and integrate the K v. a curve 
     did = 0
 
     for doid in doid_list: # loop over damage origins (i.e. nodes)
-        if verbose: print "------ doid:", doid," --------"
+        if verbose: print("------ doid:", doid," --------")
         xyz,delxyz,sigxyz=model.GetNodeInfo(doid) #@
         cracks.AddDamOro(doid,xyz) #@
         # try to catch the doid causing the problem! 
 ##        try: 
-        for j in xrange(num_bcs): # loop over boundary conditions 
+        for j in range(num_bcs): # loop over boundary conditions 
             caseid=j+1
             cracks.AddDamdid(doid,did,caseid) #@
             # loop over different initial a's, and b's
-            for k in xrange(len(parameters.a_b)):
+            for k in range(len(parameters.a_b)):
                 # loop over init_a_sim to get simulation for smallest ai.  
                 if parameters.monte == 1: 
                     # loop over init_a_sim to get simulation for smallest
@@ -344,7 +344,7 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
                         N = 1.01*parameters.N_max
                         cracks.UpdateN(doid,did,a,N)
                         # now loop over the sets
-                        for setid in xrange(len(initial_a)):
+                        for setid in range(len(initial_a)):
                             # add a blank list to set data in statistics  
                             # instances in __DamOro
                             cracks.UpdateSet(doid)  
@@ -368,7 +368,7 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
 
                         cracks.UpdateN(doid,did,aG,N_tot)
                         # now loop over the sets
-                        for setid in xrange(len(initial_a)):
+                        for setid in range(len(initial_a)):
                             # add a blank list to set data in statistics  
                             # instances in __DamOro
                             cracks.UpdateSet(doid)  
@@ -416,31 +416,31 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
                                 Nminus=cracks.IntegrateLife(aG,did,doid,\
                                                   initial_a[setid][-1], \
                                                   parameters.N_max)
-                                print ' '
-                                print "Check if entire amount subtracted",\
+                                print(' ')
+                                print("Check if entire amount subtracted",\
                                       "is approximately equal to ",\
-                                      "integrating"
-                                print " interval [aG,"\
-                                      "initial_a[setid][-1]]."
-                                print " The integral for that limit is: ",\
-                                      Nminus
-                                print " N_tot = N + Nminus"
-                                print " N_tot", N_tot
-                                print " N + Nminus", N+Nminus
-                                print ' '
+                                      "integrating")
+                                print(" interval [aG,"\
+                                      "initial_a[setid][-1]].")
+                                print(" The integral for that limit is: ",\
+                                      Nminus)
+                                print(" N_tot = N + Nminus")
+                                print(" N_tot", N_tot)
+                                print(" N + Nminus", N+Nminus)
+                                print(' ')
 
                             cracks.CalcStats(doid,setid,ncr)
 
                     if verbose:
                         af,bf = cracks.GiveCurrentGeo(did)[1][0],\
                                 cracks.GiveCurrentGeo(did)[1][1]
-                        print ' '
-                        print ' doid: ', doid, \
+                        print(' ')
+                        print(' doid: ', doid, \
                               ' Life is:', cracks.GiveMeLife(doid), \
                               ' WillGrow:', cracks.GiveMeWG(doid), \
                               ' ai, bi: %1.4e, %1.4e' %(aG,aG),'-->',\
-                              '%1.4e, %1.4e' %(af,bf)   
-                        print ' '
+                              '%1.4e, %1.4e' %(af,bf))   
+                        print(' ')
 
                 else:
                     # ***** this is not the most efficient way to do this 
@@ -452,9 +452,9 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
                     # Calc number of iterations to meet max crack size 
                     # (users specified).  (r^n)*a=a_max, add 2 so that if 
                     # changes damage type still gets to a_max.  
-                    iters = Numeric.log(parameters.Max_crack_size/a)/ \
-                            Numeric.log(parameters.r)
-                    iters = int(Numeric.ceil(iters))+2
+                    iters = np.log(parameters.Max_crack_size/a)/ \
+                            np.log(parameters.r)
+                    iters = int(np.ceil(iters))+2
                     dam_history={'ab':[[a,b]], '-ab':[[a,b]]}
                     cracks.AddFDam(doid,did,dam_history)
                     errfile_name=parpath+filename+errfile_extension
@@ -473,13 +473,13 @@ def Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
                     if verbose:
                         af,bf = cracks.GiveCurrentGeo(did)[1][0],\
                                 cracks.GiveCurrentGeo(did)[1][1]
-                        print ' '
-                        print ' doid: ', doid, \
+                        print(' ')
+                        print(' doid: ', doid, \
                               ' Life is:', cracks.GiveMeLife(doid), \
                               ' WillGrow:', cracks.GiveMeWG(doid), \
                               ' ai, bi: %1.4e, %1.4e' %(a,b),'-->',\
-                              '%1.4e, %1.4e' %(af,bf)   
-                        print ' '
+                              '%1.4e, %1.4e' %(af,bf))   
+                        print(' ')
 
                 did+=1
 ##        # if we catch it, good, else, keep going!  
@@ -670,20 +670,20 @@ def Monte(a_b,sets,samples,seed=None):
 
     if seed: random.seed(seed)
 
-    for set in xrange(sets):
+    for set in range(sets):
         ais.UpdateSet()
 
-        for samp in xrange(samples):
+        for samp in range(samples):
             # random to generate uni sample
             uni=random.uniform(0,1) 
 
 ##            # a two param weibull
-##            a=a_b[0][0]*(-1.0*Numeric.log(1.0-uni))**(1.0/a_b[0][1])
+##            a=a_b[0][0]*(-1.0*np.log(1.0-uni))**(1.0/a_b[0][1])
 
             # 3 param weibull.
             gamma = 6.1 # from Gary Harlow for AA7075-T651
             samp=(a_b[0][0]*\
-                  ((-1.0*Numeric.log(1.0-uni))**(1.0/a_b[0][1])))+gamma
+                  ((-1.0*np.log(1.0-uni))**(1.0/a_b[0][1])))+gamma
             # samp is the TS area... a is the radius:  
             # 3.937e-5 converts from microns to inches
             a=3.937e-5*math.sqrt(samp/math.pi)
@@ -712,7 +712,7 @@ def MonteSimulation(ais,ais_map,cracks,parpath,filename,extension,\
     initial_a = local_ais.rv
     init_a_sim=[]
     for set in initial_a:
-        init_a_sim+=set.keys()
+        init_a_sim+=list(set.keys())
     init_a_sim.sort()
 
     # if len(initial_a_sim) == 0, then particle cracking filter said no
@@ -728,13 +728,13 @@ def MonteSimulation(ais,ais_map,cracks,parpath,filename,extension,\
             cracks.CalcStats(doid,setid,ncr)
 
         if verbose:
-            print ' '
-            print ' No particles cracked! ', \
+            print(' ')
+            print(' No particles cracked! ', \
                   ' doid: ', doid, \
                   ' Life is:', parameters.N_max*1.01, \
                   ' WillGrow:', 0, \
-                  ' ai: None'
-            print ' '
+                  ' ai: None')
+            print(' ')
 
         return None
 
@@ -756,14 +756,14 @@ def MonteSimulation(ais,ais_map,cracks,parpath,filename,extension,\
 
     if verbose:
         af,bf = cracks.DamOro[doid].DamEl[-1].GiveCurrent()
-        print ' '
-        print ' For Largest ai @', \
+        print(' ')
+        print(' For Largest ai @', \
               ' doid: ', doid, \
               ' Life is:', cracks.DamOro[doid].Life, \
               ' WillGrow:', cracks.DamOro[doid].WillGrow, \
               ' ai: %1.4e' %(ai),'-->',\
-              "%1.4e, %1.4e" %(af,bf)
-        print ' '
+              "%1.4e, %1.4e" %(af,bf))
+        print(' ')
 
     # if the largest crack does NOT want to grow (.willgrow = 0), is growing
     # stably until Nmax is reached (.willgorw = 1) or is in compression
@@ -787,13 +787,13 @@ def MonteSimulation(ais,ais_map,cracks,parpath,filename,extension,\
 
                 if verbose:
                     af,bf = cracks.DamOro[doid].DamEl[-1].GiveCurrent()
-                    print '\n', \
+                    print('\n', \
                           ' doid: ', doid, \
                           ' Life is:', N, \
                           ' WillGrow:', cracks.DamOro[doid].WillGrow, \
                           ' ai: %1.4e' %(ai),'-->',\
-                          "%1.4e, %1.4e" %(af,bf)
-                    print ' '
+                          "%1.4e, %1.4e" %(af,bf))
+                    print(' ')
 
                 # if willgrow = 2, unstable growth occurred: stop 
                 # iterating over intial ai's
@@ -843,22 +843,22 @@ def GetBox():
     define the bounding box for the spaitally limited simulation.  only calls
     this function if -L is in command line.
     '''
-    print ' '
-    print ' Must define a bounding box to limit the selection of nodes'
-    print ' to be included.  This is done with two points.  One defines'
-    print ' the minimum x,y,z coords, and the other defines the maximum.'
-    print ' '
-    print 'Enter minimum x coord'
+    print(' ')
+    print(' Must define a bounding box to limit the selection of nodes')
+    print(' to be included.  This is done with two points.  One defines')
+    print(' the minimum x,y,z coords, and the other defines the maximum.')
+    print(' ')
+    print('Enter minimum x coord')
     xmin = float(sys.stdin.readline().split()[0])
-    print 'Enter minimum y coord'
+    print('Enter minimum y coord')
     ymin = float(sys.stdin.readline().split()[0])
-    print 'Enter minimum z coord'
+    print('Enter minimum z coord')
     zmin = float(sys.stdin.readline().split()[0])
-    print 'Enter maximum x coord'
+    print('Enter maximum x coord')
     xmax = float(sys.stdin.readline().split()[0])
-    print 'Enter maximum y coord'
+    print('Enter maximum y coord')
     ymax = float(sys.stdin.readline().split()[0])
-    print 'Enter maximum z coord'
+    print('Enter maximum z coord')
     zmax = float(sys.stdin.readline().split()[0])
     return ((xmin,ymin,zmin),(xmax,ymax,zmax))
 
@@ -868,7 +868,7 @@ def GetSetNumber():
     '''
     get the set number the user is interested in.
     '''
-    print ' Enter set to display mean and variance for (-1 to exit):'
+    print(' Enter set to display mean and variance for (-1 to exit):')
     setid = int(sys.stdin.readline().split()[0])
     return setid
 
@@ -878,11 +878,11 @@ def GetName():
     '''
     get the input file name and location.
     ''' 
-    print " Enter file name"
+    print(" Enter file name")
     filename = sys.stdin.readline().split()[0]
-    print " Enter *.con file path"
+    print(" Enter *.con file path")
     conpath = sys.stdin.readline().split()[0]
-    print " Enter *.par file path"
+    print(" Enter *.par file path")
     parpath = sys.stdin.readline().split()[0]
     return filename,conpath,parpath
 
@@ -892,11 +892,11 @@ def GetncrRange():
     '''
     get critical life range for the statistics
     ''' 
-    print " minimum acceptable crictical life "
+    print(" minimum acceptable crictical life ")
     min_ncr = float(sys.stdin.readline().split()[0])
-    print " maximum acceptable critical life"
+    print(" maximum acceptable critical life")
     max_ncr = float(sys.stdin.readline().split()[0])
-    print " spacing"
+    print(" spacing")
     space = float(sys.stdin.readline().split()[0])
     
     return min_ncr,max_ncr,space
@@ -911,8 +911,8 @@ def GetSatisfied(function):
     arg=function()
     satisfied = 0
     while satisfied == 0:
-        print ' you entered', arg
-        print " Is this correct? (y/n)"
+        print(' you entered', arg)
+        print(" Is this correct? (y/n)")
         response = sys.stdin.readline()
         if 'y' in response or 'Y' in response:
             satisfied = 1
@@ -955,7 +955,7 @@ def MakeLocalAis(ais,ais_map,doid):
     '''
 
     # there's only one set!!  COMPASS keeps track how rid's map to sets.
-    if ais_map.has_key(doid):
+    if doid in ais_map:
         local_ais=Statistic.Stata(1,len(ais_map[doid]))
         local_ais.UpdateSet() 
         for RID in ais_map[doid]:
@@ -981,8 +981,8 @@ def DoParallel(doid_list,node_list,seed=None):
     # loop over length of machines file to build doid_pickle.*'s
     numprocs = int(os.environ['procs'])
     old = 0
-    for i in xrange(numprocs-1):
-        count = (i+1)*(len(new_doidlist)/numprocs)
+    for i in range(numprocs-1):
+        count = (i+1)*(len(new_doidlist)//numprocs)
         templist=new_doidlist[old:count]
         templist.sort()
         tfile=open('node_partition.'+str(i),'w')
@@ -1019,13 +1019,13 @@ def FwdDeterministic(cracks,doid,xyz,parameters,verbose,verify,parpath,\
 
     if verbose:
         af,bf = cracks.DamOro[doid].DamEl[-1].GiveCurrent()
-        print ' '
-        print ' doid: ', doid, \
+        print(' ')
+        print(' doid: ', doid, \
               ' Life is:', N, \
               ' WillGrow:', cracks.DamOro[doid].WillGrow, \
               ' ai, bi: %1.4e, %1.4e' %(a,b),'-->',\
-              '%1.4e, %1.4e' %(af,bf)   
-        print ' '
+              '%1.4e, %1.4e' %(af,bf))   
+        print(' ')
 
 
 #############
@@ -1040,7 +1040,7 @@ def Fwd_Integration(ais,model,cracks,num_bcs,parameters,verbose,\
 
     for doid in doid_list: # loop over damage origins (i.e. nodes)
 
-        if verbose: print "------ doid:", doid," --------"
+        if verbose: print("------ doid:", doid," --------")
         xyz,delxyz,sigxyz=model.GetNodeInfo(doid) 
 
 ##        try: 
@@ -1191,7 +1191,7 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
     N_max = 1.01*parameters.N_max
 
     for doid in doid_list: # loop over damage origins (i.e. nodes)
-        if verbose: print "------ doid:", doid," --------"
+        if verbose: print("------ doid:", doid," --------")
         xyz,delxyz,sigxyz=model.GetNodeInfo(doid)
         # try to catch the doid causing the problem! 
 ##        try: 
@@ -1222,7 +1222,7 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
 
                 init_a_sim=[]
                 for set in initial_a:
-                    init_a_sim+=set.keys()
+                    init_a_sim+=list(set.keys())
 
                 init_a_sim.sort()
                 init_a_sim.reverse()
@@ -1238,23 +1238,23 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
                 cracks.AddFDam(doid,xyz,ai,ai,parameters.material,verbose, \
                                verify)
                 if verbose:
-                    print ' Performing cycle-by-cycle integration for variable'
-                    print '    amplitude loading for largest ai '
+                    print(' Performing cycle-by-cycle integration for variable')
+                    print('    amplitude loading for largest ai ')
                 N_tot,fin = cracks.VarAmp(doid,aR,parameters.N_max,\
                                           Spec,nore,Scale,parameters.r)
                 akeep=ai
 
                 if verbose:
                     af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
-                    print ' '
-                    print ' For Largest ai:'
-                    print ' doid: ', doid, \
+                    print(' ')
+                    print(' For Largest ai:')
+                    print(' doid: ', doid, \
                           ' Life is:', N_tot, \
-                          ' WillGrow:', cracks.DamOro[doid].WillGrow
-                    print ' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
-                          ' af, bf: %1.4e, %1.4e' %(af,bf)
-                    print ' K(a), K(b): %1.4e, %1.4e' %(ka,kb)
-                    print ' '
+                          ' WillGrow:', cracks.DamOro[doid].WillGrow)
+                    print(' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
+                          ' af, bf: %1.4e, %1.4e' %(af,bf))
+                    print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
+                    print(' ')
 
             # now post process the results of variable amplitude loading from
             # the largest ai.  
@@ -1282,7 +1282,7 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
                     # assume that when one crack returns WillGrow==0 or -1
                     # the smaller ones will too.  Use ffwd to check it...
                     ffwd=0 
-                    reversed_alist=initial_a[setid].keys()
+                    reversed_alist=list(initial_a[setid].keys())
                     reversed_alist.sort()
                     reversed_alist.reverse()
                     for a in reversed_alist:
@@ -1312,14 +1312,14 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
 
                         if verbose:
                             af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
-                            print ' '
-                            print ' doid: ', doid, \
+                            print(' ')
+                            print(' doid: ', doid, \
                                   ' Life (for this interval):', N, \
-                                  ' WillGrow:', cracks.DamOro[doid].WillGrow
-                            print ' ai, bi: %1.4e, %1.4e' %(a,a),'-->',\
-                                  ' af, bf: %1.4e, %1.4e' %(af,bf)
-                            print ' K(a), K(b): %1.4e, %1.4e' %(ka,kb)
-                            print ' '
+                                  ' WillGrow:', cracks.DamOro[doid].WillGrow)
+                            print(' ai, bi: %1.4e, %1.4e' %(a,a),'-->',\
+                                  ' af, bf: %1.4e, %1.4e' %(af,bf))
+                            print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
+                            print(' ')
 
                     cracks.CalcStats(doid,setid,ncr)
 
@@ -1334,14 +1334,14 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
 
             if verbose:
                 af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
-                print ' '
-                print ' doid: ', doid, \
+                print(' ')
+                print(' doid: ', doid, \
                       ' Life is:', N_tot, \
-                      ' WillGrow:', cracks.DamOro[doid].WillGrow
-                print ' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
-                      ' af, bf: %1.4e, %1.4e' %(af,bf)
-                print ' K(a), K(b): %1.4e, %1.4e' %(ka,kb)
-                print ' '
+                      ' WillGrow:', cracks.DamOro[doid].WillGrow)
+                print(' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
+                      ' af, bf: %1.4e, %1.4e' %(af,bf))
+                print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
+                print(' ')
 
         # life prediction for doid is complete ---> now postprocess.
 
@@ -1413,11 +1413,11 @@ if __name__ == "__main__":
     crack_front = TakeArgv()
 
     if verbose:
-        print '            ---------------------------------------------------'
-        print '                    DDSim Level I - version 1.5 (M)            '
-        print '             This run began at:', time.asctime(time.localtime())
-        print '            ---------------------------------------------------'
-        print ''
+        print('            ---------------------------------------------------')
+        print('                    DDSim Level I - version 1.5 (M)            ')
+        print('             This run began at:', time.asctime(time.localtime()))
+        print('            ---------------------------------------------------')
+        print('')
 
     num_bcs = 1 # hard code number of boundary condition sets to 1
 
@@ -1428,11 +1428,11 @@ if __name__ == "__main__":
     # do some processing input arguments and prompt for more information as
     # necessary
     if surface == 1:
-        print '******************* surf_only = 1  *******************'
+        print('******************* surf_only = 1  *******************')
 
     doid_range = None
     if limit == 1 and parallel == 0 and local_node == 0:
-        print '******************* limit_doid = 1 *******************'
+        print('******************* limit_doid = 1 *******************')
         if default == 1:
             doid_range=((6.0,0.37,-0.05),(6.1,0.46,5.0))
         else: doid_range=GetSatisfied(GetBox)
@@ -1474,10 +1474,10 @@ if __name__ == "__main__":
                               savepickleall,default,example,base)
 
     if verbose:
-        print ' arguments:', sys.argv
-        print parameters
-        print "Random initial a's list:"
-        print ais
+        print(' arguments:', sys.argv)
+        print(parameters)
+        print("Random initial a's list:")
+        print(ais)
 
     # create the DamModel object
     cracks = DamModel.DamModel(model,node_list,verbose,verify,extension, \
@@ -1486,46 +1486,46 @@ if __name__ == "__main__":
 
     # now do the life prediction simulation with the appropriate ais
     if Int_type=="Simp":
-        print " Using a Simpson's integration rule..."
-        print ' '
-        print "  --> WARNING!  This option is dead in this version. "
-        print "      It is much faster and more accurate to just run the RK-5"
-        print "      forward integration routine for constant amplitude "
-        print "      loading.  Exiting now..."
+        print(" Using a Simpson's integration rule...")
+        print(' ')
+        print("  --> WARNING!  This option is dead in this version. ")
+        print("      It is much faster and more accurate to just run the RK-5")
+        print("      forward integration routine for constant amplitude ")
+        print("      loading.  Exiting now...")
         sys.exit()
         Kva_History(ais,model,cracks,num_bcs,parameters,verbose,\
                     saveintermediate,parpath,filename,extension,doid_list,\
                     errfile_extension,ncr,scale)
     elif var_file:
         if nore:
-            print ' Variable Amplitude loading... No retardation model'
-            print ' '
+            print(' Variable Amplitude loading... No retardation model')
+            print(' ')
         else:
-            print ' Variable Amplitude loading... Willenborg retardation model'
-            print ' '
+            print(' Variable Amplitude loading... Willenborg retardation model')
+            print(' ')
         Var_Amplitude(ais,model,cracks,parameters,verbose,\
                       saveintermediate,parpath,conpath,filename,extension, \
                       doid_list,errfile_extension,ncr,scale,nore,data_base, \
                       local_node,ais_map)
     else: 
-        print " Using an Adaptive RK-5 Forward integration scheme..."
-        print ' '
+        print(" Using an Adaptive RK-5 Forward integration scheme...")
+        print(' ')
         Fwd_Integration(ais,model,cracks,num_bcs,parameters,verbose,\
                         saveintermediate,parpath,filename,extension,doid_list,\
                         errfile_extension,ncr,scale,Int_type,verify,ais_map)
 
     # some post-processing... 
     if printall==1: # -pa
-        print ' '
-        print ' The following is from DamModel.py... '
+        print(' ')
+        print(' The following is from DamModel.py... ')
         cracks.PrintDamInfo('all','all',parameters.monte,'all')
     elif printall==2: # -pdid
-        print ' '
-        print ' The following is from DamModel.py... '
+        print(' ')
+        print(' The following is from DamModel.py... ')
         cracks.PrintDamInfo('none','all',parameters.monte,'all')
     elif printall==3: # -pdoid
-        print ' '
-        print ' The following is from DamModel.py... '
+        print(' ')
+        print(' The following is from DamModel.py... ')
         cracks.PrintDamInfo('all','none',parameters.monte,'all')
 
     if savepickleall: # -sp, binary pickled files. pass file object
@@ -1560,7 +1560,7 @@ if __name__ == "__main__":
 
     if savecontour: # -sc
         if parameters.monte:
-            for i in xrange(parameters.sets):
+            for i in range(parameters.sets):
                 MAPFile = open(parpath+filename+'.MP'+str(i),'w')
                 cracks.ToMAPFile(MAPFile,i)
         else:
@@ -1585,10 +1585,10 @@ if __name__ == "__main__":
         Timefile.close()
 
     if verbose: 
-        print ''
-        print '            ---------------------------------------------------'
-        print '            This run ended at:', time.asctime(time.localtime())
-        print '            For a total elapsed time of (s):', time.clock()
-        print '            ---------------------------------------------------'
+        print('')
+        print('            ---------------------------------------------------')
+        print('            This run ended at:', time.asctime(time.localtime()))
+        print('            For a total elapsed time of (s):', time.clock())
+        print('            ---------------------------------------------------')
 
 ############## bottom ##################

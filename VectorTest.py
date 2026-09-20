@@ -6,7 +6,7 @@ if __name__ == "__main__":
     b=[-2, 3, 4, -2.0]
     e=0.5
 
-    for i in xrange(10000000):
+    for i in range(10000000):
 
         c= Plus(a,b)
         d= Minus(a,b)

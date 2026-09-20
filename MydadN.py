@@ -448,7 +448,7 @@ class Willenborg(dadN):
         # constant amplitude.  **Note:  Willenborg's model is for retardation
         # due to overload cycles in variable amplitude loading, hence, it only
         # makes sense that R should be passed in!  
-        if not R:
+        if R is None or R > 100.:  # same rule as the compiled dadN.pyd
             R = self.R
 
         # compute incoming Kmax and Kmin
@@ -510,6 +510,9 @@ class Willenborg(dadN):
             # passing None for DKth, might want to check if is compatible with
             # newton solve above.  
             return self.Calc_dadN(DKi,a,N,Reff,None)
+
+    # name used by the compiled dadN.pyd (DamMo calls this)
+    Compute_dadN = Willenborg
 
 ####### Willenborg
 

@@ -92,3 +92,20 @@ def test_dDKth_dReff_matches_finite_difference():
     a, Reff, h = 0.5, 0.3, 1e-6
     fd = (fat.Calc_DKth(a, Reff + h) - fat.Calc_DKth(a, Reff - h)) / (2 * h)
     assert fat.dDKthbydReff(a, Reff) == pytest.approx(fd, rel=1e-4)
+
+
+def test_compute_dadN_alias_matches_willenborg():
+    # DamMo calls Compute_dadN (the name exposed by the compiled dadN.pyd)
+    a, N, DK = 0.5, 1e6, 80.0
+    w1, w2 = Willenborg(MATERIAL, 0), Willenborg(MATERIAL, 0)
+    w1.SetKol(); w2.SetKol()
+    assert w1.Compute_dadN(DK, a, N, R) == w2.Willenborg(DK, a, N, R)
+
+
+def test_willenborg_explicit_zero_R_is_respected():
+    # R = 0.0 is a valid ratio; only "missing" (None / > 100) falls back to the .par R
+    a, N, DK = 0.5, 1e6, 80.0
+    w0, w1 = Willenborg(MATERIAL, 0), Willenborg(MATERIAL, 0)
+    w0.SetKol(); w1.SetKol()
+    assert w0.Willenborg(DK, a, N, 0.0) == pytest.approx(w1.Calc_dadN(DK, a, N, 0.0))
+    assert w0.Willenborg(DK, a, N, 0.0) != pytest.approx(w1.Calc_dadN(DK, a, N, R))

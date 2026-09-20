@@ -79,7 +79,7 @@ class SurfaceMesh:
         mesh.
         '''
 
-        for node in self.__Nodes.values():
+        for node in list(self.__Nodes.values()):
             if node.x() > self.maxX: self.maxX = node.x()
             if node.y() > self.maxY: self.maxY = node.y()
             if node.z() > self.maxZ: self.maxZ = node.z()
@@ -93,7 +93,7 @@ class SurfaceMesh:
 # ------ SurfaceMesh --------
 
     def GiveListofNodes(self):
-        x = self.__Nodes.keys()
+        x = list(self.__Nodes.keys())
         return x.sort()
 
 # ------ SurfaceMesh --------
@@ -109,13 +109,13 @@ class SurfaceMesh:
         ''' 
 
         # do CORNER nodes
-        for i in xrange(surfelem.num_corn_nodes):
+        for i in range(surfelem.num_corn_nodes):
             elist=self.__revcon.get(surfelem.corners[i],[])
             elist.append(seid)
             self.__revcon[surfelem.corners[i]]=elist
 
         # do MIDSIDE nodes
-        for i in xrange(surfelem.num_mid_nodes):
+        for i in range(surfelem.num_mid_nodes):
             elist=self.__revcon.get(surfelem.mid_sides[i],[])
             elist.append(seid)
             self.__revcon[surfelem.mid_sides[i]]=elist
@@ -130,7 +130,7 @@ class SurfaceMesh:
 
         is_surf=0 # 0 = is not on surface
                   # 1 = is on surface
-        if self.__revcon.has_key(nid):
+        if nid in self.__revcon:
             is_surf = 1
         else:
             is_surf = 0
@@ -146,7 +146,7 @@ class SurfaceMesh:
         if seid == 'all':
             corn_nodes=[]
             mid_nodes=[]
-            for i in xrange(len(self.__elems)):
+            for i in range(len(self.__elems)):
                 corn_nodes+=[self.__elems[i].corners]
                 mid_nodes+=[self.__elems[i].mid_sides]
             return corn_nodes,mid_nodes
@@ -160,24 +160,24 @@ class SurfaceMesh:
 
     def elshowme(self,seid):
         if seid == 'all': 
-            for seid in self.__elems.keys():
+            for seid in list(self.__elems.keys()):
                 corn_nodes=self.__elems[seid].corners
                 mid_nodes=self.__elems[seid].mid_sides
-                print ' Surface Element -', seid,'-'
-                print ' corner nodes: ', corn_nodes
-                print ' midside nodes: ', mid_nodes
+                print(' Surface Element -', seid,'-')
+                print(' corner nodes: ', corn_nodes)
+                print(' midside nodes: ', mid_nodes)
         else:
             corn_nodes=self.__elems[seid].corners
             mid_nodes=self.__elems[seid].mid_sides
-            print ' Surface Element -', seid,'-'
-            print ' corner nodes: ', corn_nodes
-            print ' midside nodes: ', mid_nodes
+            print(' Surface Element -', seid,'-')
+            print(' corner nodes: ', corn_nodes)
+            print(' midside nodes: ', mid_nodes)
 
 # ------ SurfaceMesh --------
 
     def revgiveme(self,nid):
         if nid == 'all': 
-            for i in xrange(len(self.__revcon)):
+            for i in range(len(self.__revcon)):
                 node=i
                 elems=self.__revcon[i]
                 return node,elems
@@ -193,13 +193,13 @@ class SurfaceMesh:
             for id in self.__revcon:
                 node=id
                 elems=self.__revcon[id]
-                print ' Surface Node -', node,'-'
-                print ' Reverse Connectivity: ', elems
+                print(' Surface Node -', node,'-')
+                print(' Reverse Connectivity: ', elems)
         else:
             node=nid
             elems=self.__revcon[nid]
-            print ' Surface Node -', node,'-'
-            print ' Reverse Connectivity: ', elems
+            print(' Surface Node -', node,'-')
+            print(' Reverse Connectivity: ', elems)
 
 # ------ SurfaceMesh --------
 
