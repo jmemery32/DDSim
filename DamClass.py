@@ -48,23 +48,12 @@ def _stress_normal_to_crack(model,Rotation,center,ypnts,zpnts):
     Normal stress on the crack plane at the points  center + y*e2 + z*e3  for
     every (y,z) pair (y varying slowest), followed by the value at ``center``.
 
-    Rotation's rows are the crack frame: e1 (the crack normal), e2, e3.  All
-    points go to the mesh in ONE batched query (GetPtStresses) and the normal
-    component  e1 . sigma . e1  is evaluated with the same expression, in the same
-    operation order, as the original one-point-at-a-time loops.
+    Rotation's rows are the crack frame: e1 (the crack normal), e2, e3.  The
+    mesh does all the work in one compiled call (MeshTools.NormalStressSamples),
+    with the same expression and operation order as the original
+    one-point-at-a-time loops.
     '''
-    A = Rotation[0][0]
-    B = Rotation[0][1]
-    C = Rotation[0][2]
-    y = np.repeat(np.asarray(ypnts,dtype=float),len(zpnts))
-    z = np.tile(np.asarray(zpnts,dtype=float),len(ypnts))
-    pts = np.empty((len(y)+1,3))
-    for k in range(3):
-        pts[:-1,k] = center[k] + (Rotation[1][k]*y+Rotation[2][k]*z)
-        pts[-1,k] = center[k]
-    sig = model.GetPtStresses(pts)      # columns: xx yy zz xy yz zx
-    xx,yy,zz,xy,yz,zx = (sig[:,i] for i in range(6))
-    return A*A*xx + B*B*yy + C*C*zz + 2.0*A*B*xy + 2.0*A*C*zx + 2.0*B*C*yz
+    return model.NormalStressSamples(Rotation,center,ypnts,zpnts)
 
 
 class Damage:

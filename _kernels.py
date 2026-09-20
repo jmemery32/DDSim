@@ -436,3 +436,43 @@ def stress_batch(pts, cached, tol, max_its, origin, inv_cell, dims, cell_start, 
             return k, cached
         interpolate(code[i], conn[i], sig, nat, out[k], N, tmp)
     return pts.shape[0], cached
+
+
+@njit(cache=True)
+def normal_stress_samples(R, center, ypnts, zpnts, cached, tol, max_its, origin, inv_cell,
+                          dims, cell_start, cell_items, lo, hi, code, conn, xyz, sig, f):
+    """Normal stress on a crack plane sampled on a grid, then at its center.
+
+    Points are ``center + y * R[1] + z * R[2]`` for every ``(y, z)`` pair (``y``
+    varying slowest) followed by ``center`` itself; ``R``'s rows are the crack
+    frame (``R[0]`` = crack-plane normal).  ``f[k] = R0 . sigma(x_k) . R0``,
+    evaluated with the same expression and operation order as the 2007 loops
+    (``sig`` columns: xx yy zz xy yz zx).
+
+    Returns ``(n_done, cached)``; ``n_done`` < number of points means a point
+    fell outside the mesh.
+    """
+    ny = ypnts.shape[0]
+    nz = zpnts.shape[0]
+    npts = ny * nz + 1
+    pts = np.empty((npts, 3))
+    idx = 0
+    for a in range(ny):
+        for b in range(nz):
+            for k in range(3):
+                pts[idx, k] = center[k] + (R[1, k] * ypnts[a] + R[2, k] * zpnts[b])
+            idx += 1
+    for k in range(3):
+        pts[idx, k] = center[k]
+    out = np.empty((npts, 6))
+    done, cached = stress_batch(pts, cached, tol, max_its, origin, inv_cell, dims, cell_start,
+                                cell_items, lo, hi, code, conn, xyz, sig, out)
+    if done < npts:
+        return done, cached
+    A = R[0, 0]
+    B = R[0, 1]
+    C = R[0, 2]
+    for i in range(npts):
+        f[i] = (A * A * out[i, 0] + B * B * out[i, 1] + C * C * out[i, 2]
+                + 2.0 * A * B * out[i, 3] + 2.0 * A * C * out[i, 5] + 2.0 * B * C * out[i, 4])
+    return npts, cached

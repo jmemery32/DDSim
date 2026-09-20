@@ -282,6 +282,30 @@ class MeshTools:
             raise EmptySearchResult("empty range tree search")
         return out
 
+    def NormalStressSamples(self, Rotation, center, ypnts, zpnts):
+        """Stress normal to a crack plane, sampled on a grid: fused, compiled version of
+        ``GetPtStresses`` + ``e1 . sigma . e1``.
+
+        ``Rotation`` (3x3) has the crack frame in its rows (row 0 = crack-plane
+        normal); the samples are ``center + y*row1 + z*row2`` for every ``(y, z)``
+        (``y`` slowest) followed by ``center``.  Returns the ``len(y)*len(z) + 1``
+        normal stresses.  Raises ``EmptySearchResult`` like ``GetPtStress``.
+        """
+        R = np.ascontiguousarray(Rotation, dtype=float)
+        c = np.array([center[0], center[1], center[2]], dtype=float)
+        ys = np.ascontiguousarray(ypnts, dtype=float)
+        zs = np.ascontiguousarray(zpnts, dtype=float)
+        f = np.empty(len(ys) * len(zs) + 1)
+        cached = -1 if self._cached is None else self._cached
+        done, cached = _K.normal_stress_samples(
+            R, c, ys, zs, cached, self.PointInsideTol, _MAX_ITS, self._origin, self._inv_cell,
+            self._dims, self._cell_start, self._cell_items, self._lo, self._hi, self._code,
+            self._conn, self._xyz, self._sig, f)
+        self._cached = None if cached < 0 else int(cached)
+        if done < len(f):
+            raise EmptySearchResult("empty range tree search")
+        return f
+
     def GetPtStress(self, pt):
         """Stress tensor (ColTensor) interpolated at ``pt``.
 

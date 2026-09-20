@@ -181,3 +181,25 @@ def test_example1_outside(example1):
     status, dist = example1.IsPointOutsideMesh(as_vec([0, 0, 10.5]))
     assert status == -1 and dist == pytest.approx(0.5, abs=1e-3)
     assert example1.IsPointOutsideMesh(as_vec([0, 0, 500]))[0] == -3
+
+
+def test_normal_stress_samples_matches_unfused_computation(example1):
+    rng = np.random.default_rng(21)
+    for _ in range(20):
+        q, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+        center = rng.uniform(-3, 3, 3)
+        ys, zs = [-1.2, 0.0, 1.2], [0.0, 0.7, 1.4]
+        f = example1.NormalStressSamples(q, center, ys, zs)
+
+        pts = [center + y * q[1] + z * q[2] for y in ys for z in zs] + [center]
+        sig = example1.GetPtStresses(pts)                    # xx yy zz xy yz zx
+        e = q[0]
+        expected = [e @ np.array([[s[0], s[3], s[5]], [s[3], s[1], s[4]], [s[5], s[4], s[2]]]) @ e
+                    for s in sig]
+        assert f == pytest.approx(expected, rel=1e-12, abs=1e-12)
+        assert len(f) == 10
+
+
+def test_normal_stress_samples_raises_outside_the_mesh(example1):
+    with pytest.raises(MeshTools.EmptySearchResult):
+        example1.NormalStressSamples(np.eye(3), [0.0, 0.0, 1e4], [0.0], [0.0])
