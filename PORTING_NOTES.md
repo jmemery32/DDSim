@@ -30,3 +30,18 @@ adaptive **step-size control**, not the RK5 solution itself.
 * `Statistic.Stata.UpdateSamples` tests `if RID:`, so an explicit RID of 0
   falls into the auto-numbering branch. Harmless when RIDs start at 0.
 * `Parameters` raises `IndexError` on a blank line in a `.par` file.
+
+## Native (Python 2 C-API) modules and their replacements
+
+| 2007 module | Replacement | Status |
+|---|---|---|
+| `dadN.pyd` (`dadN.dadN(mat, surf)` is really the C++ `Willenborg` class) | `MydadN.Willenborg` (`Compute_dadN` alias). `DamClass` builds these directly. | done, tested |
+| `Vec3D.pyd` | `Vec3D.py` (semantics copied from `Vec3DModule.cpp`: `v*v` is dot, `Normalize` returns a new vector) | done, tested |
+| `ColTensor.pyd` | `ColTensor.py` (`PrincipalValues` sorted descending, like the Jacobi routine) | done, tested |
+| `JohnsVectorTools.pyd` | `JohnsVectorTools.py` (source never recovered; inferred from call sites) | done, tested |
+| `MeshTools.pyd` (`MeshTools.MeshTools(name,'RDB')`) | Python `Model` class + RDB reader (format documented in `MeshTools.cpp::ReadRelationalDBFiles`) | **todo** |
+| `GeomUtils.pyd` (`BuildSurfMeshCObject`, `EllipseCMeshIntersections`, `EllipseArcLength`) | scipy/numpy port of `GeomUtils.cpp` | **todo** |
+
+Other things the compiled `dadN.pyd` did differently from `MydadN.py`, now aligned:
+`Willenborg` substituted the material R only when the R passed in was `> 100`
+(the Python version replaced any falsy R, including a legitimate `0.0`).
