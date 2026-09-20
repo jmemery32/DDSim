@@ -1,0 +1,11 @@
+name: ddsim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - netcdf4   # Exodus II (NetCDF) reader
+  - numba     # tight-loop acceleration
+  - pytest
+  - matplotlib

@@ -179,3 +179,21 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+####
+## DDSim modernization
+##
+# Legacy C++ Python-extension sources and the Cornell "FTools" support library
+# (support/). Kept on disk for reference (element shape functions, RDB reader,
+# NASGRO dadN, ...) but deliberately NOT versioned until we know which we need.
+*.cpp
+*.hpp
+*.h
+*.suo
+*.suo.old
+.svn/
+/support/
+
+# vim swap files
+.*.swp
+*.swp
