@@ -9,3 +9,6 @@ dependencies:
   - numba     # tight-loop acceleration
   - pytest
   - matplotlib
+  - pip
+  - pip:
+      - -e .  # editable install of the ddsim package itself (see pyproject.toml)

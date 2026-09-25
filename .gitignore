@@ -183,16 +183,18 @@ cython_debug/
 ####
 ## DDSim modernization
 ##
-# Legacy C++ Python-extension sources and the Cornell "FTools" support library
-# (support/). Kept on disk for reference (element shape functions, RDB reader,
-# NASGRO dadN, ...) but deliberately NOT versioned until we know which we need.
+# Original C++ Python-extension sources and the Cornell "FTools" support
+# library, kept on disk for reference (element shape functions, RDB reader,
+# NASGRO dadN, ...) but deliberately NOT versioned -- they have all been
+# reimplemented in src/ddsim (see docs/architecture.md) and were never
+# buildable standalone anyway (missing headers, Python 2 C-API).
+/reference/
 *.cpp
 *.hpp
 *.h
 *.suo
 *.suo.old
 .svn/
-/support/
 
 # vim swap files
 .*.swp
