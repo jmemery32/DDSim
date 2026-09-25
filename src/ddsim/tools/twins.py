@@ -1,5 +1,5 @@
 import pickle, os, sys
-from . import Statistic
+from .. import Statistic
 
 def Ansys2Sig(ansysfile,sigfile,confile):
     '''
