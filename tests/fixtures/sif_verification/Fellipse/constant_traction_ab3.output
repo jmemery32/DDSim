@@ -1,0 +1,111 @@
+            ---------------------------------------------------
+                    DDSim Level I - version 1.5 (M)            
+             This run began at: Wed Nov 15 16:20:50 2006
+            ---------------------------------------------------
+
+ arguments: ['z:\\research\\URETI\\code\\python\\DDsimV1.5\\DDSim.py', '-base', 'constant_traction', '-v', '-verify', '-doid_list', '666', '-pa', '-sp']
+  -->  The input parameters are: 
+ path: 
+ file: constant_traction
+ Monte = 0, a = 1.000000e+000, b = 3.333000e-001 
+ dN = 2.500e+002, max_error = 9.000e-001 
+ N_max = 1.000e+005, min_inc = 1.000000e-007 
+ Sets = 1, Samples = 1000, r = 1.100e+000, Max_crack_size = 1.000000e+001
+ NASGRO material properties are: 
+ UTS = 85.0 YS = 75.0 Kie = 38.0 Kic = 28.0
+ Ak = 0.75 Bk = 2.0 C = 3e-008 n = 2.8
+ n' = 3.5 p = 0.5 q = 1.0 DK1 = 0.7
+ Cthp = 1.3 Cthm = 0.1 Rcl = 0.7 alpha = 2.0
+ Smax/SIGo = 0.3 R = 0.0 a0 = 0.00015 damp = 1000.0
+ Rso = 3.0
+
+Random initial a's list:
+None
+ Using an Adaptive RK-5 Forward integration scheme...
+ 
+------ doid: 666  --------
+
+ ---------------- Damage Element: Fellipse -------
+ doid          = 666
+ Current center: 0 0 10
+ deltaN list   : 
+ 
+ a      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ b      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+
+ na      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ nb      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+ ---------------- End Damage Element: Fellipse -------
+
+
+  Fellipse  Rotation matrix is:
+array([[-2.05287616e-015,  1.00000000e+000, -1.82859549e-014],
+       [ 8.10612461e-001,  1.23720311e-014,  5.85582990e-001],
+       [ 5.85582990e-001, -1.36206935e-014, -8.10612461e-001]])
+
+ switch to one step fwd Euler for Fellipse at doid 666 due to All growth rates <= 0.0
+ switch to one step fwd Euler for Fellipse at doid 666 due to All growth rates <= 0.0
+ 
+ doid:  666  Life is: 1639.00041039  WillGrow: 0  ai, bi: 1.0000e+000, 3.3330e-001 --> 1.0000e+000, 3.3331e-001
+ 
+ 
+ The following is from DamModel.py... 
+
+---------------- Damage Origin id =      666 ------------------
+ coords         =  0 0 10
+ initial a      =  1.0
+ Predicted Life =  1639.00041039
+ **** Damage Elements: 
+
+ ---------------- Damage Element: Fellipse -------
+ doid          = 666
+ Current center: 0 0 10
+ deltaN list   : 
+ 250.0, 627.97160787739506, 250.0, 1.5773933612004833, 3.9622329811527841, 9.9526792638374317, 25.0, 62.7971607877395, 157.73933612004831, 250.0, 0.0
+ a      =  crack lengths (11): 
+ 1.000000e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000
+ 
+ Stress Intenstiy Factors (11): 
+ 5.304361e-001,  5.304413e-001,  5.304494e-001,  5.304515e-001,  5.304515e-001,  5.304515e-001,  5.304516e-001,  5.304517e-001,  5.304520e-001,  5.304524e-001,  5.304526e-001
+
+ b      =  crack lengths (11): 
+ 3.333000e-001,  3.333039e-001,  3.333101e-001,  3.333116e-001,  3.333116e-001,  3.333116e-001,  3.333117e-001,  3.333117e-001,  3.333119e-001,  3.333122e-001,  3.333124e-001
+ 
+ Stress Intenstiy Factors (11): 
+ 9.187872e-001,  9.187910e-001,  9.187968e-001,  9.187982e-001,  9.187982e-001,  9.187982e-001,  9.187983e-001,  9.187984e-001,  9.187985e-001,  9.187988e-001,  9.187990e-001
+
+ na      =  crack lengths (11): 
+ 1.000000e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000,  1.000001e+000
+ 
+ Stress Intenstiy Factors (11): 
+ 5.304361e-001,  5.304413e-001,  5.304494e-001,  5.304515e-001,  5.304515e-001,  5.304515e-001,  5.304516e-001,  5.304517e-001,  5.304520e-001,  5.304524e-001,  5.304526e-001
+
+ nb      =  crack lengths (11): 
+ 3.333000e-001,  3.333039e-001,  3.333101e-001,  3.333116e-001,  3.333116e-001,  3.333116e-001,  3.333117e-001,  3.333117e-001,  3.333119e-001,  3.333122e-001,  3.333124e-001
+ 
+ Stress Intenstiy Factors (11): 
+ 9.187872e-001,  9.187910e-001,  9.187968e-001,  9.187982e-001,  9.187982e-001,  9.187982e-001,  9.187983e-001,  9.187984e-001,  9.187985e-001,  9.187988e-001,  9.187990e-001
+ ---------------- End Damage Element: Fellipse -------
+
+
+--------------------------------------------------------------- 
+
+
+            ---------------------------------------------------
+            This run ended at: Wed Nov 15 16:20:50 2006
+            For a total elapsed time of (s): 0.539072404656
+            ---------------------------------------------------

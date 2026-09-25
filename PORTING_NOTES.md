@@ -149,3 +149,43 @@ died with a RecursionError for any interior crack that outgrew the cube.
   relative (a direction-dependent bug would break this) -- `test_cube_symmetry_*`.
 * `np.float64 * Vec3D` used to return an ndarray (numpy saw a sequence); fixed with
   `__array_ufunc__ = None` on `Vec3D` / `ColTensor`. It only bit on corner nodes.
+
+## Golden-output verification against the original 2006 program
+
+`tests/fixtures/sif_verification/` (copied from `SIF_Verification/{Fellipse,Hellipse}`,
+small non-proprietary verification cubes, ~1000 elements) holds the literal
+captured stdout of the pre-port, Windows/Python-2.4 DDSim.py run with `-verify`,
+for `Fellipse` (embedded) and `Hellipse` (surface) cracks against Abaqus stress
+fields of increasing polynomial order (constant, linear, bilinear, biquadratic).
+
+`tests/test_sif_verification_golden.py` reruns these through the CURRENT
+`DDSim.py` and compares every crack length and K value in the growth history,
+not just the final life. **10 of 11 cases match the original to 4+ significant
+figures**, including the bilinear and biquadratic (non-uniform) stress fields --
+strong evidence the ported NASGRO/Willenborg/RK5/mesh-interpolation/
+principal-stress chain is faithful.
+
+### The one exception: Hellipse, depth > surface half-length ("ab3333")
+
+The original's output for this case (`a=0.3333` depth, `b=1.0` surface
+half-length) gives EXACTLY the same life as the "ab3" case (`a=1.0`, `b=0.3333`)
+-- 2035.22370851 to 9 significant figures -- even though these are genuinely
+different crack shapes (one wide-and-shallow along the free surface, the other
+narrow-and-deep into the material). Investigated and ruled out:
+
+* The Newman-Raju formula's two branches (`a<=c` / `a>c`) agree at the boundary
+  `a==c` (continuity holds) -- `test_hellipse_newman_raju_continuous_at_depth_equals_surface_length`
+  in `test_sif_validation.py`.
+* The geometric `Fellipse` -> `Hellipse` conversion (`__FtoH`) does not produce
+  swapped dimensions for these two inputs -- traced with instrumentation; the
+  crack plane here is exactly axis-aligned (principal stress along one edge,
+  surface normal along another) and there is no rotation that maps one crack
+  onto the other.
+
+Conclusion: the exact agreement in the original is most likely a genuine bug in
+the 2006 code (very likely something that silently ignored which of a/b was
+larger for this crack type), not a real symmetry. This port does NOT reproduce
+it; `test_ab3333_known_divergence` locks in the port's own (internally
+consistent) answer instead, so the difference is visible rather than silently
+drifting. If this is ever confirmed against the original source/binary, update
+this note.

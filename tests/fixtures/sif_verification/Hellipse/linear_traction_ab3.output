@@ -1,0 +1,160 @@
+            ---------------------------------------------------
+                    DDSim Level I - version 1.5 (M)            
+             This run began at: Wed Dec 06 16:20:52 2006
+            ---------------------------------------------------
+
+ arguments: ['z:\\research\\URETI\\code\\python\\DDsimV1.5\\DDSim.py', '-base', 'linear_traction', '-v', '-verify', '-doid_list', '611', '-pa', '-sp']
+  -->  The input parameters are: 
+ path: 
+ file: linear_traction
+ Monte = 0, a = 1.000000e+000, b = 3.333000e-001 
+ dN = 2.500e+002, max_error = 9.000e-001 
+ N_max = 1.000e+005, min_inc = 1.000000e-007 
+ Sets = 1, Samples = 1000, r = 1.100e+000, Max_crack_size = 1.000000e+001
+ NASGRO material properties are: 
+ UTS = 85.0 YS = 75.0 Kie = 38.0 Kic = 28.0
+ Ak = 0.75 Bk = 2.0 C = 3e-008 n = 2.8
+ n' = 3.5 p = 0.5 q = 1.0 DK1 = 0.7
+ Cthp = 1.3 Cthm = 0.1 Rcl = 0.7 alpha = 2.0
+ Smax/SIGo = 0.3 R = 0.0 a0 = 0.00015 damp = 1000.0
+ Rso = 3.0
+
+Random initial a's list:
+None
+ Using an Adaptive RK-5 Forward integration scheme...
+ 
+------ doid: 611  --------
+
+ ---------------- Damage Element: Fellipse -------
+ doid          = 611
+ Current center: 0 0 20
+ deltaN list   : 
+ 
+ a      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ b      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+
+ na      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ nb      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+ ---------------- End Damage Element: Fellipse -------
+
+
+  Fellipse  Rotation matrix is:
+array([[-9.66621084e-013,  1.00000000e+000,  3.56850530e-006],
+       [ 1.00000000e+000,  9.66731493e-013, -3.09397273e-011],
+       [-3.09397308e-011,  3.56850530e-006, -1.00000000e+000]])
+
+
+ ---------------- Damage Element: Hellipse -------
+ doid          = 611
+ Current center: 0 0 20
+ deltaN list   : 
+ 
+ a      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ b      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+
+ na      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+ ---------------- End Damage Element: Hellipse -------
+
+
+  Hellipse  Rotation matrix is:
+array([[-9.66621084e-013,  1.00000000e+000,  3.56850530e-006],
+       [ 1.00000000e+000,  9.66694691e-013, -2.06268940e-011],
+       [-2.06268975e-011,  3.56850530e-006, -1.00000000e+000]])
+
+ switch to one step fwd Euler for Hellipse at doid 611 due to All growth rates <= 0.0
+ 
+ doid:  611  Life is: 1128.63629522  WillGrow: 2  ai, bi: 1.0000e+000, 3.3330e-001 --> 1.3397e+000, 1.5100e+000
+ 
+ 
+ The following is from DamModel.py... 
+
+---------------- Damage Origin id =      611 ------------------
+ coords         =  0 0 20
+ initial a      =  1.0
+ Predicted Life =  1128.63629522
+ **** Damage Elements: 
+
+ ---------------- Damage Element: Fellipse -------
+ doid          = 611
+ Current center: 0 0 20
+ deltaN list   : 
+ 0.0
+ a      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ b      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+
+ na      =  crack lengths (1): 
+ 1.000000e+000
+ 
+ Stress Intenstiy Factors (0):
+
+ nb      =  crack lengths (1): 
+ 3.333000e-001
+ 
+ Stress Intenstiy Factors (0):
+ ---------------- End Damage Element: Fellipse -------
+
+
+
+ ---------------- Damage Element: Hellipse -------
+ doid          = 611
+ Current center: 0 0 20
+ deltaN list   : 
+ 250.0, 296.92442992942864, 331.71186529285904, 250.0, 0.0
+ a      =  crack lengths (5): 
+ 1.000000e+000,  1.017643e+000,  1.063684e+000,  1.190168e+000,  1.339740e+000
+ 
+ Stress Intenstiy Factors (5): 
+ 1.270104e+001,  1.618199e+001,  2.108382e+001,  2.693988e+001,  3.114514e+001
+
+ b      =  crack lengths (5): 
+ 3.333000e-001,  4.586531e-001,  6.892100e-001,  1.101713e+000,  1.510021e+000
+ 
+ Stress Intenstiy Factors (5): 
+ 1.999995e+001,  2.191264e+001,  2.381152e+001,  2.545498e+001,  2.666959e+001
+
+ na      =  crack lengths (5): 
+ 1.000000e+000,  1.017643e+000,  1.063684e+000,  1.190168e+000,  1.339740e+000
+ 
+ Stress Intenstiy Factors (5): 
+ 1.270104e+001,  1.618199e+001,  2.108382e+001,  2.693988e+001,  3.114514e+001
+ ---------------- End Damage Element: Hellipse -------
+
+
+--------------------------------------------------------------- 
+
+
+            ---------------------------------------------------
+            This run ended at: Wed Dec 06 16:20:52 2006
+            For a total elapsed time of (s): 0.395017179329
+            ---------------------------------------------------

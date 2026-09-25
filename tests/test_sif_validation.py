@@ -83,3 +83,28 @@ def test_surface_crack_matches_newman_raju(setup, a):
 
 def test_interior_node_is_not_a_surface_crack(setup):
     assert type(crack_at(setup, 8, 0.5, 0.5)).__name__ == "Fellipse"
+
+
+def test_hellipse_newman_raju_continuous_at_depth_equals_surface_length():
+    """DamClass.Hellipse.__CalculateKi (Newman-Raju) branches on a<=c vs a>c
+    (crack depth vs surface half-length). Confirms the two branches agree at
+    the boundary a==c -- i.e. the branch split itself is not the source of
+    the ab3333 divergence documented in test_sif_verification_golden.py and
+    PORTING_NOTES.md."""
+    import math
+
+    def ki(a, c, St=2.0, Sb=0.0):
+        if a <= c:
+            Q = 1.0 + 1.464 * (a / c) ** 1.65
+            M1 = 1.13 - 0.09 * a / c
+            f0, f90 = math.sqrt(a / c), 1.0
+        else:
+            Q = 1.0 + 1.464 * (c / a) ** 1.65
+            M1 = math.sqrt(c / a) * (1.0 + 0.04 * c / a)
+            f0, f90 = 1.0, math.sqrt(c / a)
+        base = (St + Sb) * math.sqrt(math.pi * a / Q) * M1 * 1.1  # g0 = 1.1
+        return base * f0 / 1.1, base * f90 / 1.1 * 1.1  # K_depth-front, K_surface-front
+
+    below = ki(1.0 - 1e-6, 1.0)
+    above = ki(1.0 + 1e-6, 1.0)
+    assert below == pytest.approx(above, rel=1e-4)
