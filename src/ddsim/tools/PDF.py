@@ -1,8 +1,9 @@
-import MydadN, Statistic
+from . import MydadN
+from . import Statistic
 from matplotlib import pylab
 import math, sys, os, copy
 import numpy as np
-import JohnsVectorTools as JVT
+from . import JohnsVectorTools as JVT
 
 
 ########################################################

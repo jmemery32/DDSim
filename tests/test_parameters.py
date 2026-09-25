@@ -1,6 +1,6 @@
 import pytest
 
-from Parameters import Parameters
+from ddsim.Parameters import Parameters
 
 PAR = """# a comment
 a_b

@@ -5,8 +5,8 @@ import pytest
 from scipy import integrate
 from scipy.special import ellipe
 
-import GeomUtils as G
-import Vec3D
+from ddsim import GeomUtils as G
+from ddsim import Vec3D
 
 I3 = [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
@@ -218,7 +218,7 @@ def test_offset_center_and_tilted_plane_matches_brute_force():
 # compiled kernels vs the readable numpy reference
 # ---------------------------------------------------------------------------
 def test_point_in_triangle_kernel_matches_reference():
-    import _geom_kernels as GK
+    from ddsim import _geom_kernels as GK
     rng = np.random.default_rng(9)
     for _ in range(300):
         tri = rng.normal(size=(3, 3))

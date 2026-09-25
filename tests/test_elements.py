@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import elements as E
+from ddsim import elements as E
 
 # natural coordinates of every node, read off the shape functions in ElemClass.cpp
 NODES = {
@@ -115,7 +115,7 @@ def test_faces_are_on_the_boundary_and_consistently_oriented(name):
 def test_newton_kernel_matches_numpy_solve(name):
     """The compiled Newton solve (Cramer's rule) recovers natural coordinates for
     a distorted element, checked against an independent np.linalg.solve iteration."""
-    import _kernels as K
+    from ddsim import _kernels as K
     el = E.ELEMENTS[name]
     rng = np.random.default_rng(4)
     nodes = np.array(NODES[name], dtype=float)

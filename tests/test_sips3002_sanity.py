@@ -14,7 +14,7 @@ import os
 import numpy as np
 import pytest
 
-import MeshTools
+from ddsim import MeshTools
 
 SIPS_DIR = os.environ.get("DDSIM_SIPS3002_DIR")
 pytestmark = pytest.mark.skipif(

@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from MydadN import dadN, Willenborg
+from ddsim.MydadN import dadN, Willenborg
 
 UTS, YS, RCL, R = 572.0, 503.0, 0.7, 0.1  # assumed
 MATERIAL = [UTS, YS, 1320.0, 972.7, 0.75, 2.0, 3.0e-8, 2.8, 0.5, 1.0, 24.32,

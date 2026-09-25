@@ -25,7 +25,6 @@ import sys
 import pytest
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "sif_verification")
-DDSIM = os.path.join(os.path.dirname(__file__), "..", "DDSim.py")
 
 # (crack_dir, mesh_basename, golden_output, doid)
 CASES = [
@@ -96,7 +95,7 @@ def run_case(tmp_path, crack_dir, base, golden_name, doid):
     par_path.write_text("".join(lines))
 
     proc = subprocess.run(
-        [sys.executable, DDSIM, "-base", base, "-conpath", "./", "-parpath", "./",
+        [sys.executable, "-m", "ddsim.DDSim", "-base", base, "-conpath", "./", "-parpath", "./",
          "-v", "-verify", "-doid_list", str(doid), "-pa", "-sp"],
         cwd=work, capture_output=True, text=True, timeout=120)
     assert proc.returncode == 0, proc.stderr[-3000:]

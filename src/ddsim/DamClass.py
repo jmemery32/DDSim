@@ -3,16 +3,19 @@ import numpy as np
 import pickle
 
 # wash
-import Vec3D
-import ColTensor
-import MeshTools
-import JohnsVectorTools as JVT
-import MydadN
+from . import Vec3D
+from . import ColTensor
+from . import MeshTools
+from . import JohnsVectorTools as JVT
+from . import MydadN
 # John D
-import GeomUtils
-import Integration
+from . import GeomUtils
+from . import Integration
 # me
-import Statistic, DamClass, DamHistory, DamErrors
+from . import Statistic
+from . import DamClass
+from . import DamHistory
+from . import DamErrors
 
 # some global functions that come in handy (usually) when debugging... 
 

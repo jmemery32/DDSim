@@ -16,10 +16,10 @@ import numpy as np
 import pytest
 from scipy.special import ellipe
 
-import DamClass
-import DamMo
-import MeshTools
-import Parameters
+from ddsim import DamClass
+from ddsim import DamMo
+from ddsim import MeshTools
+from ddsim import Parameters
 
 EXAMPLE = os.path.join(os.path.dirname(__file__), "..", "examples", "example1") + os.sep
 SIGMA = 3.4

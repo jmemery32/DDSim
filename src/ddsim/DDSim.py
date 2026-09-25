@@ -1,12 +1,13 @@
 import sys, time
-import MeshTools
-import DamMo as DamModel
-import VarAmplitude
-import Parameters
-import Vec3D, ColTensor 
+from . import MeshTools
+from . import DamMo as DamModel
+from . import VarAmplitude
+from . import Parameters
+from . import Vec3D
+from . import ColTensor
 import numpy as np
 import math, os, pickle, random
-import Statistic # for plotting cdf of ai's.
+from . import Statistic # for plotting cdf of ai's.
 
 # verification flag --> makes some things print automatically
 #                      (1, true, makes it print)
@@ -1393,10 +1394,15 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
 
 ############## top ##################
 
-if __name__ == "__main__": 
+def main():
     '''
-    main coding stars here... 
+    main coding stars here...
     '''
+    # Fwd_Integration() reads these as bare module globals (it takes neither as
+    # a parameter, unlike Var_Amplitude()), matching the original script's
+    # behavior from when this function body was a top-level `if __name__ ==
+    # "__main__":` block instead of def main().
+    global data_base, local_node
 
     time.process_time()
 
@@ -1592,3 +1598,6 @@ if __name__ == "__main__":
         print('            ---------------------------------------------------')
 
 ############## bottom ##################
+
+if __name__ == "__main__":
+    main()

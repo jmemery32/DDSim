@@ -3,16 +3,19 @@ import os, sys, math, pickle, types
 import numpy as np
 
 # wash
-import Vec3D
-import ColTensor
-import MeshTools
+from . import Vec3D
+from . import ColTensor
+from . import MeshTools
 ##import dadN
-import JohnsVectorTools as JVT
+from . import JohnsVectorTools as JVT
 # me
-import Statistic, DamClass, VarAmplitude, DamErrors
+from . import Statistic
+from . import DamClass
+from . import VarAmplitude
+from . import DamErrors
 # John D
-import GeomUtils
-import Integration 
+from . import GeomUtils
+from . import Integration
 
 # give dumpfile the string name for a file and varamp will dump
 # a vs N to a file named dumpfile.  Leave as None if you do not

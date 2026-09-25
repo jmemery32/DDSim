@@ -3,13 +3,13 @@ import os
 import numpy as np
 import pytest
 
-import MeshTools
-import Vec3D
-import elements as E
-import mesh_io
+from ddsim import MeshTools
+from ddsim import Vec3D
+from ddsim import elements as E
+from ddsim import mesh_io
 from test_elements import NODES
 
-EXAMPLE1 = os.path.join(os.path.dirname(__file__), "..", "LevelIIIv0.1", "models", "example1")
+EXAMPLE1 = os.path.join(os.path.dirname(__file__), "..", "examples", "example1", "example1")
 
 A = np.array([[2.0, 0.3, 0.0], [0.1, 1.5, 0.2], [0.0, 0.4, 3.0]])   # det > 0, affine map
 B = np.array([1.0, 2.0, 3.0])

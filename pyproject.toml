@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ddsim"
+version = "1.5.0"
+description = "DDSim Level I: hierarchical, probabilistic fatigue life prediction"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "John Emery" }]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "numba",
+]
+
+[project.optional-dependencies]
+exodus = ["netCDF4"]
+plotting = ["matplotlib"]
+dev = ["pytest"]
+
+[project.scripts]
+ddsim = "ddsim.DDSim:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -3,10 +3,10 @@ import math
 import numpy as np
 import pytest
 
-import JohnsVectorTools as JVT
-import Vec3D
-from ColTensor import ColTensor
-from Vec3D import CrossProd, TripleProd
+from ddsim import JohnsVectorTools as JVT
+from ddsim import Vec3D
+from ddsim.ColTensor import ColTensor
+from ddsim.Vec3D import CrossProd, TripleProd
 
 
 def test_vec3d_arithmetic():

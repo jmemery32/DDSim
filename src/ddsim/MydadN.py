@@ -6,7 +6,7 @@ try:  # compiled 2007 version; only used by the comparison harness at the bottom
 except ImportError:
     PYDdadN = None
 
-import Newton # for Willenborg()
+from . import Newton # for Willenborg()
 
 ### Exceptions
 ##NewtonSolve_ExceedMaxIts = "Newton.Solve() no convergence"

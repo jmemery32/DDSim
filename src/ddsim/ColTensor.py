@@ -6,7 +6,7 @@ Pure-Python replacement for the compiled ColTensor.pyd
 """
 import numpy as np
 
-import Vec3D as _V
+from . import Vec3D as _V
 
 
 class ColTensor:

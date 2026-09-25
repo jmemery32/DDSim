@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import Newton
+from ddsim import Newton
 
 
 def test_solve_scalar_quadratic():

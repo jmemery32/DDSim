@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-import Integration as I
+from ddsim import Integration as I
 
 
 def rhs(t, y, args):

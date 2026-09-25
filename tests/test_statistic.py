@@ -1,6 +1,6 @@
 import pytest
 
-import Statistic
+from ddsim import Statistic
 
 LIST1 = [1.2, 3.0, 3.1, 3.4, 5.4]
 LIST2 = [1253.4, 1485.1, 6984.2, 4512.2, 7845.3]

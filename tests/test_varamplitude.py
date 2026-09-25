@@ -1,6 +1,6 @@
 import pytest
 
-from VarAmplitude import Spectrum
+from ddsim.VarAmplitude import Spectrum
 
 
 def write(tmp_path, lines):

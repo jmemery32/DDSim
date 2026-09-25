@@ -28,11 +28,11 @@ Deliberate differences from the 2007 implementation
 """
 import numpy as np
 
-import ColTensor as _CT
-import Vec3D as _V
-import _kernels as _K
-import elements as _E
-import mesh_io as _io
+from . import ColTensor as _CT
+from . import Vec3D as _V
+from . import _kernels as _K
+from . import elements as _E
+from . import mesh_io as _io
 
 
 class EmptySearchResult(Exception):

@@ -25,7 +25,7 @@ functions are polynomials, so this is exact to machine precision and removes
 """
 import numpy as np
 
-import _kernels as _K
+from . import _kernels as _K
 
 _H = 1e-30  # complex-step size; exact for polynomials
 

@@ -1,4 +1,4 @@
-"""Golden end-to-end regression: run the real DDSim.py driver on example1.
+"""Golden end-to-end regression: run the real ddsim.DDSim driver on example1.
 
 The numbers below are the life predictions of the pure-Python (pre-numba)
 implementation for nodes 10 and 0, which the compiled kernels reproduce to the
@@ -36,7 +36,7 @@ def run_driver(tmp_path, nodes, scale):
     work = tmp_path / "example1"
     shutil.copytree(EXAMPLE, work)
     proc = subprocess.run(
-        [sys.executable, os.path.join(ROOT, "DDSim.py"), "-base", "example1",
+        [sys.executable, "-m", "ddsim.DDSim", "-base", "example1",
          "-conpath", "./", "-parpath", "./", "-v", "-doid_list", nodes, "-scale", scale],
         cwd=work, capture_output=True, text=True, timeout=600)
     assert proc.returncode == 0, proc.stderr[-2000:]

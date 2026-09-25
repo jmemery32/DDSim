@@ -33,7 +33,7 @@ import math
 
 import numpy as np
 
-import _geom_kernels as _GK
+from . import _geom_kernels as _GK
 
 _TWO_PI = 2.0 * math.pi
 _GL_X, _GL_W = np.polynomial.legendre.leggauss(9)
