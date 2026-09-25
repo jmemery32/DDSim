@@ -59,6 +59,7 @@ initial flaws) per node.
 | `VarAmplitude.py` | Variable-amplitude load spectrum reader | yes |
 | `tools/PDF.py` | Weibull / reliability plotting (reproduces Figs. 25/27/29 of the 2009 paper) | no |
 | `tools/twins.py` | ANSYS→`.sig` conversion; merges per-process output files from the old parallel workflow | no |
+| `tools/rdb_to_exodus.py` | Converts an RDB mesh (+ its `.sig` stress) to Exodus for visualization -- no crack growth involved. `python -m ddsim.tools.rdb_to_exodus <rdb_base> <out.exo>` | yes |
 
 `legacy/unused_modules/` (`Contour.py`, `Interpolator.py`, `InterpTable.py`,
 `SurfaceMesh.py`) are ported (2to3'd, they compile) but are not imported by anything
