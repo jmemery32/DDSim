@@ -209,10 +209,29 @@ Newton kernels were only previously exercised on the 12-element `example1` and
 the ~1000-element SIF_Verification cubes). This is also the node-count/surface
 detection validation for the Level II/III style large models going forward.
 
-## Planned: SIPS3002 per-particle validation (not yet run)
+## Real 2007 results visualized directly (`n_to_exodus.py`)
 
 `SIPS_data/DDSimLI/SIPS3002_open/ConstantAmplitude/10000_Particles/` has real
 2007 parallel-run output (`.N`/`.ai`/`.ori`) from the actual validation study.
+`3002_open_CA_10000Parts_070530.N` (the latest of several dated runs in that
+directory) has exactly **63,974** unique node ids -- an exact match to the
+paper's surface-node count (see the sanity check above), confirming it's the
+full real result set, not a partial run. `n_to_exodus.py` reads it (`doid rid
+N` per line, any number of particle rows per node), reduces each node to the
+plain arithmetic mean of its `N` values (matching `Statistic.StatN
+.SampleMean`, the same reduction `DamModel.LifeValues`/`ToExodusFile` use),
+and writes it as a `life` nodal variable via `exodus_io.write_exodus` --
+nodes never seeded (not surface candidates) come back NaN. Run on the real
+model: 63,974/172,601 nodes have a life value, mean 98,403, min **25,293**
+cycles -- the same order of magnitude as node 113831's individual worst
+particle results below, consistent (this is a mean across all particles at
+each node, not the single worst particle at the single worst node, so an
+exact match isn't expected). Verified end-to-end with `pvpython` (see the
+Exodus section above) alongside `stress`, which `write_exodus` includes
+automatically from the RDB mesh's own `.sig`.
+
+## Planned: SIPS3002 per-particle validation (not yet run)
+
 Node **113831** (one of the hole-16 hot-spot cluster) has 8,812 individual
 particle results (life 10,904-97,112 cycles) with real `(rid, ai)` pairs
 recoverable from `sips3002.map`/`sips3002.rnd` -- rich per-sample ground truth,
@@ -286,6 +305,58 @@ locks this in.
   quadratic tets): real computed life -> `ToExodusFile` -> read back -> exact
   match, plus confirming un-run nodes come back as NaN (masked in ParaView),
   distinct from `DamMo.HighLife` (a node that ran and never failed).
+
+### Three real ParaView/VTK-reader bugs found converting the actual SIPS3002 model
+
+Round-trip tests above validate `write_exodus` against `read_exodus` -- both
+ours, so a shared misunderstanding of the format wouldn't be caught. Writing
+the real 172,601-node SIPS3002 model and opening it in actual ParaView
+(6.2.0-RC2) surfaced three bugs invisible to that round trip, found by
+reproducing "opens fine, crashes/comes back empty on Apply" directly with
+`pvpython` (VTK's own `vtkIOSSReader`/`vtkExodusIIReader`, no GUI needed) so
+each fix could be verified against the real reader instead of guessed at:
+
+1. **`file_size`/`coord` mismatch.** `file_size=1` ("large model") tells
+   readers to expect coordinates split into `coordx`/`coordy`/`coordz`; we
+   wrote `file_size=1` but a single combined `coord` variable. VTK's reader
+   errored outright on Apply: `failed to locate x nodal coordinates`
+   (`RequestInformation`, which doesn't read coordinates, succeeds regardless
+   -- hence "opens fine").
+2. **Non-positive external IDs.** `node_num_map`/`elem_num_map` were written
+   straight from DDSim's native RDB IDs, which are 0-based. VTK's IOSS reader
+   rejects an ID of 0 (`node/element mapping routines detected non-positive
+   global id 0`) and silently drops the *entire* element block rather than
+   erroring loudly -- from the GUI this looks like "opens, then Apply gives
+   an empty/broken model". Fixed by shifting each of the node and element ID
+   spaces independently by the minimal constant needed to make the smallest
+   ID 1, only when the source data isn't already positive (so already-1-based
+   data round-trips with no offset). Connectivity is unaffected -- it already
+   indexed by row position, not external ID.
+3. **Combined `coord` silently zeros every nodal variable.** After fixing
+   (1) by writing `file_size=0` with combined `coord`, geometry read back
+   correctly but every nodal variable (`life`, `stress_xx`, ...) came back as
+   all-zero -- a real quirk of this reader version specific to the
+   `file_size=0`/combined-`coord` combination (confirmed by writing an
+   otherwise-identical minimal file with VTK's own `vtkIOSSWriter`, which
+   uses split coords + `file_size=1`, and finding *that* file's nodal
+   variables read correctly). Fixed by writing split `coordx`/`coordy`/
+   `coordz` + `file_size=1` throughout -- the one combination verified to get
+   both geometry and nodal variables right. (`read_exodus` already handled
+   both conventions; fixing it turned up a fourth, smaller bug: its split-coord
+   read path returned a `numpy.ma.MaskedArray` -- a netCDF4 read artifact,
+   nothing is ever actually masked in our files -- which `scipy.ConvexHull`
+   flatly rejects regardless of whether anything's masked. `_read_coords` now
+   returns a plain `ndarray` from both branches.)
+
+All three are now locked in as regression tests in `test_exodus_io.py`
+(`test_written_ids_are_never_non_positive`,
+`test_write_leaves_already_positive_ids_unshifted`,
+`test_write_uses_split_coords_matching_file_size_flag`) -- structural checks
+on the written file, since the repo has no ParaView/VTK dependency to run the
+real reader in CI. The regenerated `SIPS3002_open.exo` was independently
+re-verified end-to-end with `pvpython` after each fix: correct point/cell
+counts and the same peak `stress_xx` = 79.802928 as the earlier numeric
+validation.
 
 ### Also fixed while touching `DamMo.ToMAPFile`
 

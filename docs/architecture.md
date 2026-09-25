@@ -60,6 +60,7 @@ initial flaws) per node.
 | `tools/PDF.py` | Weibull / reliability plotting (reproduces Figs. 25/27/29 of the 2009 paper) | no |
 | `tools/twins.py` | ANSYS→`.sig` conversion; merges per-process output files from the old parallel workflow | no |
 | `tools/rdb_to_exodus.py` | Converts an RDB mesh (+ its `.sig` stress) to Exodus for visualization -- no crack growth involved. `python -m ddsim.tools.rdb_to_exodus <rdb_base> <out.exo>` | yes |
+| `tools/n_to_exodus.py` | Aggregates a real `.N` life-prediction result file (real captured 2007 Monte Carlo output, `doid rid N` per line) onto its RDB mesh as a nodal variable -- per-node arithmetic mean, matching `Statistic.StatN.SampleMean`; no crack growth run. `python -m ddsim.tools.n_to_exodus <rdb_base> <n_file> <out.exo> [var_name]` | yes |
 
 `legacy/unused_modules/` (`Contour.py`, `Interpolator.py`, `InterpTable.py`,
 `SurfaceMesh.py`) are ported (2to3'd, they compile) but are not imported by anything

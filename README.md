@@ -21,7 +21,7 @@ behavioral difference.
 
 ## Status
 
-**Level I is ported, numba-accelerated, and tested** (190 tests: unit tests
+**Level I is ported, numba-accelerated, and tested** (199 tests: unit tests
 for every module, golden-output regression against the *actual captured
 stdout of the original 2006 program*, and a validation suite against the
 published dissertation's real 140k-element coupon model). Levels II and III
@@ -34,7 +34,11 @@ alongside the original ASCII "RDB" format: `.con`/`.nod`/`.sig`/`.smp`/`.edg`)
 and write predicted life back out as an Exodus nodal variable
 (`-exodus_out <path>`), viewable directly as a contour plot in ParaView.
 Linear elements only for now (every real DDSim mesh uses them) — see
-`docs/PORTING_NOTES.md` for the node-order verification and scope.
+`docs/PORTING_NOTES.md` for the node-order verification and scope, and for
+three real ParaView/VTK-reader bugs found (and fixed) converting the actual
+SIPS3002 model. `ddsim.tools.n_to_exodus` visualizes real *already-computed*
+result files (`.N`, from the actual 2007 parallel runs) the same way, with no
+crack growth simulation involved.
 
 Not yet done: multiprocessing to replace the original Windows-cluster/MPI
 parallel workflow (`legacy/windows_cluster_scripts/`).

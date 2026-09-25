@@ -130,6 +130,79 @@ def test_written_elements_have_positive_volume_independent_check(tmp_path, name)
     assert ConvexHull(coords).volume > 1e-6
 
 
+def test_written_ids_are_never_non_positive(tmp_path):
+    """Regression test for a real ParaView/VTK-reader crash: writing a
+    0-based mesh (DDSim's native RDB convention) straight into
+    node_num_map/elem_num_map produced an ID of 0, which the IOSS-based
+    Exodus reader used by ParaView/VTK rejects outright ("non-positive
+    global id 0"), silently dropping the whole element block -- reproduced
+    directly with pvpython against the real SIPS3002 conversion: file opened
+    (RequestInformation succeeded) but came back with 0 points/cells on
+    Apply (RequestData). write_exodus must shift IDs to be 1-based whenever
+    the source mesh's IDs start at or below 0."""
+    mesh = synthetic_mesh("BRICK_8", n_elem=1)
+    mesh.node_ids = np.arange(0, len(mesh.node_ids))  # 0-based, like real RDB data
+    mesh.elem_ids = np.array([0])
+    mesh.connectivity = [mesh.node_ids]
+
+    path = str(tmp_path / "out.exo")
+    exodus_io.write_exodus(path, mesh, nodal_vars={})
+
+    import netCDF4
+    with netCDF4.Dataset(path) as ds:
+        node_ids = np.asarray(ds.variables["node_num_map"][:])
+        elem_ids = np.asarray(ds.variables["elem_num_map"][:])
+    assert node_ids.min() >= 1
+    assert elem_ids.min() >= 1
+    # a documented +1 shift (the minimal one that makes the smallest ID 1),
+    # not an arbitrary renumbering
+    assert sorted(node_ids) == list(range(1, len(mesh.node_ids) + 1))
+    assert list(elem_ids) == [1]
+
+
+def test_write_leaves_already_positive_ids_unshifted(tmp_path):
+    mesh = synthetic_mesh("BRICK_8", n_elem=1)  # node_ids/elem_ids already 1-based
+    path = str(tmp_path / "out.exo")
+    exodus_io.write_exodus(path, mesh, nodal_vars={})
+
+    import netCDF4
+    with netCDF4.Dataset(path) as ds:
+        node_ids = np.asarray(ds.variables["node_num_map"][:])
+        elem_ids = np.asarray(ds.variables["elem_num_map"][:])
+    assert sorted(node_ids) == sorted(int(n) for n in mesh.node_ids)
+    assert sorted(elem_ids) == sorted(int(e) for e in mesh.elem_ids)
+
+
+def test_write_uses_split_coords_matching_file_size_flag(tmp_path):
+    """Regression test for two real bugs found by reproducing "opens but
+    crashes/comes back empty on Apply" directly with pvpython (VTK's actual
+    ExodusII/IOSS reader) against the real SIPS3002 conversion:
+
+    1. Writing file_size=1 ("large model", meaning split coordx/coordy/coordz)
+       while actually writing a combined `coord` variable made the reader
+       fail outright on Apply ("failed to locate x nodal coordinates").
+    2. Fixing that by writing file_size=0 with combined `coord` stopped the
+       crash, but geometry came back fine while every nodal variable (e.g.
+       "life", "stress") silently read back as all-zero -- confirmed by
+       writing an equivalent minimal file with VTK's own vtkIOSSWriter (which
+       uses split coords + file_size=1) and finding *that* file's nodal
+       variables read correctly.
+
+    Split coordx/coordy/coordz + file_size=1 is the one combination verified
+    to get both geometry and nodal variables right, so that's what we write.
+    """
+    mesh = synthetic_mesh("BRICK_8", n_elem=1)
+    path = str(tmp_path / "out.exo")
+    exodus_io.write_exodus(path, mesh, nodal_vars={})
+
+    import netCDF4
+    with netCDF4.Dataset(path) as ds:
+        assert ds.file_size == 1
+        assert "coord" not in ds.variables
+        for axis in "xyz":
+            assert "coord" + axis in ds.variables
+
+
 def test_write_rejects_quadratic_elements(tmp_path):
     mesh = synthetic_mesh("TET_4")
     mesh.elem_types = ["TET_10"]

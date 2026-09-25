@@ -108,9 +108,13 @@ def _check_nonzero_volume(etype, coords, elem_id):
 
 
 def _read_coords(ds):
+    # netCDF4 variable reads come back as numpy.ma.MaskedArray (even when
+    # nothing is actually masked -- our files never leave a coordinate
+    # unwritten); np.asarray strips that back to a plain ndarray, which
+    # e.g. scipy's ConvexHull requires and rejects a MaskedArray for outright.
     if "coord" in ds.variables:
-        return np.ascontiguousarray(ds.variables["coord"][:].T, dtype=float)
-    return np.column_stack([ds.variables["coord" + a][:] for a in "xyz"]).astype(float)
+        return np.ascontiguousarray(np.asarray(ds.variables["coord"][:]).T, dtype=float)
+    return np.column_stack([np.asarray(ds.variables["coord" + a][:]) for a in "xyz"]).astype(float)
 
 
 def _num_map(ds, name, count):
@@ -208,6 +212,16 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
     alias for each component), so a mesh with stress round-trips completely
     through write_exodus + read_exodus alone, with no external sample file
     needed to test the stress-reading path.
+
+    ``mesh.node_ids``/``mesh.elem_ids`` are written into Exodus's external ID
+    maps (``node_num_map``/``elem_num_map``) shifted by the smallest constant
+    needed to make them 1-based, if they aren't already (DDSim's native RDB
+    IDs are 0-based). Exodus readers require positive IDs there; ParaView/VTK
+    silently drops an entire element block rather than erroring when it sees
+    a 0, which is what "opens fine, empty/broken on Apply" looks like. This
+    means ``read_exodus(write_exodus(...))`` does not reproduce 0-based IDs
+    bit-for-bit -- they come back shifted by +1 -- which is fine for our own
+    use (visualization) but worth knowing if you need the IDs to match.
     """
     import netCDF4
 
@@ -234,6 +248,21 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
         ds.api_version = np.float32(4.98)
         ds.version = np.float32(4.98)
         ds.floating_point_word_size = np.int32(8)
+        # file_size=1 ("large model") means coordinates are split into
+        # coordx/coordy/coordz (what we write below), matching what VTK's
+        # own vtkIOSSWriter produces. We used to write file_size=1 with a
+        # single combined `coord` variable, which mismatched and made
+        # ParaView/VTK's ExodusII reader crash on Apply ("failed to locate x
+        # nodal coordinates"). Switching file_size to 0 to match combined
+        # `coord` fixed that crash but uncovered a second, subtler problem:
+        # with combined `coord` + file_size=0, this reader still gets
+        # coordinates right (RequestData succeeds, geometry is correct) but
+        # silently reads every nodal variable back as all-zero -- confirmed
+        # by writing a minimal reference file with VTK's own IOSS writer
+        # (same node/var data, split coords) and seeing it read correctly
+        # where the combined-coord version didn't. Split coords + file_size=1
+        # is therefore the one combination verified (via pvpython, VTK's
+        # actual reader) to get both geometry AND nodal variables right.
         ds.file_size = np.int32(1)
 
         ds.createDimension("len_string", 33)
@@ -247,8 +276,9 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
         if nodal_vars:
             ds.createDimension("num_nod_var", len(nodal_vars))
 
-        coord = ds.createVariable("coord", "f8", ("num_dim", "num_nodes"))
-        coord[:] = mesh.coords.T
+        for i, axis in enumerate("xyz"):
+            c = ds.createVariable("coord" + axis, "f8", ("num_nodes",))
+            c[:] = mesh.coords[:, i]
 
         names = ds.createVariable("coor_names", "S1", ("num_dim", "len_string"))
         for i, n in enumerate("xyz"):
@@ -259,7 +289,17 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
         eb_status = ds.createVariable("eb_status", "i4", ("num_el_blk",))
         elem_num_map = ds.createVariable("elem_num_map", "i4", ("num_elem",))
         node_num_map = ds.createVariable("node_num_map", "i4", ("num_nodes",))
-        node_num_map[:] = mesh.node_ids
+
+        # Exodus's external ID maps must be strictly positive (1-based);
+        # readers treat 0/negative as "non-positive global id" and reject the
+        # whole block (confirmed against ParaView/VTK's IOSS reader, which
+        # silently drops every element block rather than erroring loudly).
+        # DDSim's native RDB node/element IDs are 0-based, so shift by the
+        # minimal amount needed to make the smallest ID 1 -- only when
+        # necessary, so IDs that are already positive round-trip unchanged.
+        node_offset = 1 - min(int(n) for n in mesh.node_ids) if min(mesh.node_ids) <= 0 else 0
+        elem_offset = 1 - min(int(e) for e in mesh.elem_ids) if min(mesh.elem_ids) <= 0 else 0
+        node_num_map[:] = [int(n) + node_offset for n in mesh.node_ids]
 
         elem_pos = 0
         for b, (etype, items) in enumerate(by_type.items(), start=1):
@@ -276,7 +316,7 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
             for i, (eid, our_conn) in enumerate(items):
                 exodus_conn = np.asarray(our_conn)[perm]
                 conn[i, :] = [row_of[int(n)] + 1 for n in exodus_conn]
-                elem_num_map[elem_pos] = eid
+                elem_num_map[elem_pos] = eid + elem_offset
                 elem_pos += 1
 
         time_whole = ds.createVariable("time_whole", "f8", ("time_step",))

@@ -65,8 +65,10 @@ def test_life_prediction_round_trips_through_exodus(tmp_path):
         node_ids = list(ds.variables["node_num_map"][:])
     got = dict(zip(node_ids, vals))
 
-    assert got[doid] == pytest.approx(life)
+    # write_exodus shifts 0-based IDs to be 1-based (Exodus requires positive
+    # external IDs -- see its docstring), so doid=0 comes back as 1.
+    assert got[doid + 1] == pytest.approx(life)
     # every other node was never run at all -> NaN (ParaView shows it as
     # masked/blank), distinct from cracks.HighLife (ran, never failed)
-    others = [v for n, v in got.items() if n != doid]
+    others = [v for n, v in got.items() if n != doid + 1]
     assert all(np.isnan(v) for v in others)
