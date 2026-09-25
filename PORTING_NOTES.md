@@ -189,3 +189,35 @@ it; `test_ab3333_known_divergence` locks in the port's own (internally
 consistent) answer instead, so the difference is visible rather than silently
 drifting. If this is ever confirmed against the original source/binary, update
 this note.
+
+## SIPS3002 model sanity check (real validation geometry, external data)
+
+`tests/test_sips3002_sanity.py` loads the real SIPS3002 open-hole mesh (kept
+OUTSIDE the repo -- proprietary NGC coupon geometry; set `DDSIM_SIPS3002_DIR`
+to run it, otherwise skipped) through the ported `MeshTools`/`mesh_io` and
+checks it against Sec. 6.1 of Emery et al. (2009):
+
+* **140,024** `BRICK_8` + **184** `WEDGE_6` = 140,208 elements, **172,601** nodes,
+  **63,974** surface nodes -- all EXACT matches to the paper.
+* The 25 highest-`sigma_yy` nodes form one tight spatial cluster (<2 length
+  units across, out of a model spanning ~28x6.6x1.4), consistent with the
+  paper's single reported hot-spot ("aft side of hole 16 near the intersection
+  of the counter-bore with the main-bore") rather than scattered noise.
+
+Loading the real 140k-element mesh takes ~11s (one-time cost; the numba grid/
+Newton kernels were only previously exercised on the 12-element `example1` and
+the ~1000-element SIF_Verification cubes). This is also the node-count/surface
+detection validation for the Level II/III style large models going forward.
+
+## Planned: SIPS3002 per-particle validation (not yet run)
+
+`SIPS_data/DDSimLI/SIPS3002_open/ConstantAmplitude/10000_Particles/` has real
+2007 parallel-run output (`.N`/`.ai`/`.ori`) from the actual validation study.
+Node **113831** (one of the hole-16 hot-spot cluster) has 8,812 individual
+particle results (life 10,904-97,112 cycles) with real `(rid, ai)` pairs
+recoverable from `sips3002.map`/`sips3002.rnd` -- rich per-sample ground truth,
+not just a mean. `DDSim.MonteSimulation` (already ported) can replay these
+directly without the `-DB`/SQL/MPI machinery, since it only needs the ais/
+ais_map file contents, not a live database. Deferred until after the
+multiprocessing rewrite (§ next section) so the harness only needs to be built
+once, against the final per-node execution path.
