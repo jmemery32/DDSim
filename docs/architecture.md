@@ -8,8 +8,8 @@ Fracture Mechanics* 76 (2009) 1500-1530, for that).
 
 ```
 Parameters (.par)  ─┐
-mesh_io (.con/.nod/  ├─► MeshTools (point queries: GetPtStress,      ─┐
-  .sig/.smp/.edg)   ─┘    IsPointOutsideMesh, surface normals, ...)   │
+mesh_io (RDB) or     ├─► MeshTools (point queries: GetPtStress,      ─┐
+exodus_io (Exodus)  ─┘    IsPointOutsideMesh, surface normals, ...)   │
                                                                        ▼
                           DamMo.DamModel  ──►  DamClass (Fellipse /
                           (one instance         Hellipse / Qellipse:
@@ -23,6 +23,10 @@ mesh_io (.con/.nod/  ├─► MeshTools (point queries: GetPtStress,      ─�
                                     Integration (RK4/RK5) + MydadN
                                     (NASGRO growth rate, Willenborg
                                     retardation)  ──►  per-node life N
+                                                       │
+                                    DamMo.DamModel.ToExodusFile (or
+                                    ToMAPFile) ──► life as a nodal
+                                    variable, e.g. for ParaView
 ```
 
 `DDSim.py` (`ddsim.DDSim:main`, the `ddsim` console command) is the CLI driver:
@@ -35,9 +39,10 @@ initial flaws) per node.
 
 | Module | Role | Tested |
 |---|---|---|
-| `DDSim.py` | CLI entry point / driver loop | end-to-end (`test_end_to_end.py`, `test_sif_verification_golden.py`) |
+| `DDSim.py` | CLI entry point / driver loop | end-to-end (`test_end_to_end.py`, `test_sif_verification_golden.py`, `test_exodus_end_to_end.py`) |
 | `Parameters.py` | Reads `.par` files | yes |
 | `mesh_io.py` | Reads the RDB mesh/stress ASCII format (`.con/.nod/.sig/.smp/.edg`) into `MeshData` | yes |
+| `exodus_io.py` | Reads/writes Exodus II (linear elements only: `TET_4`/`WEDGE_6`/`BRICK_8`) into/from the same `MeshData`; `DamMo.ToExodusFile` writes life predictions as a nodal variable | yes, incl. against a real sample file |
 | `elements.py` | Shape functions for the 6 solid + 4 surface element types (thin wrappers over `_kernels.py`) | yes |
 | `_kernels.py` | numba-compiled shape functions, Newton point-location solver, bounding-box grid | yes (both directly and via `elements.py`/`MeshTools.py`) |
 | `MeshTools.py` | The mesh query engine: `GetPtStress`, `IsPointOutsideMesh`, surface detection/normals, `GetNodeInfo`, etc. Replaces the compiled 2007 `MeshTools.pyd` | yes |
@@ -45,7 +50,7 @@ initial flaws) per node.
 | `_geom_kernels.py` | numba-compiled point-in-triangle / crossing kernel behind `GeomUtils.py` (a plain-numpy reference implementation is kept alongside it for cross-checking) | yes |
 | `Vec3D.py`, `ColTensor.py`, `JohnsVectorTools.py` | Vector / symmetric-tensor / list arithmetic. Replace `Vec3D.pyd`, `ColTensor.pyd`, `JohnsVectorTools.pyd` | yes |
 | `DamClass.py` | The three crack-geometry classes (`Fellipse` embedded, `Hellipse` surface, `Qellipse` corner/edge) and their stress-intensity-factor and growth logic | yes, incl. golden-output regression against the pre-port 2006 program |
-| `DamMo.py` | `DamModel`: owns the mesh + per-node damage history, drives `GrowDam`/`SimDamGrowth` | yes |
+| `DamMo.py` | `DamModel`: owns the mesh + per-node damage history, drives `GrowDam`/`SimDamGrowth`; `ToMAPFile`/`ToExodusFile` write results | yes |
 | `DamHistory.py`, `DamErrors.py` | Small history container / exception classes | yes |
 | `MydadN.py` | NASGRO crack-growth rate + Willenborg retardation (`dadN`/`Willenborg` classes). Replaces the compiled `dadN.pyd` | yes |
 | `Newton.py` | Generic Newton solve used by `Willenborg`'s effective-R iteration | yes |

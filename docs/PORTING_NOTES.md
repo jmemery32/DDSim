@@ -221,3 +221,84 @@ directly without the `-DB`/SQL/MPI machinery, since it only needs the ais/
 ais_map file contents, not a live database. Deferred until after the
 multiprocessing rewrite (§ next section) so the harness only needs to be built
 once, against the final per-node execution path.
+
+## Exodus II read/write (`exodus_io.py`)
+
+Added ahead of multiprocessing, at the user's request, so results can be
+visualized as contours in ParaView. Implemented directly against `netCDF4`
+(already a dependency) rather than adding a new one; scope is linear
+elements only (`TET_4`/`WEDGE_6`/`BRICK_8`), since every real DDSim mesh
+(the SIPS3002 validation model, `example1`, the SIF_Verification cubes) uses
+only these -- quadratic elements (`TET10`/`WEDGE15`/`HEX20`) raise a clear
+`NotImplementedError` rather than risk a silently-wrong node order with no
+way to verify it.
+
+### Node-order derivation and verification
+
+Exodus's node order does not match `elements.py`'s for `BRICK_8`: Exodus
+goes CCW around one face then the opposite face in the same order; ours is
+a binary-counting order (node k = `4r + 2s + t`). Rather than trust web
+documentation (fetching the SEACAS/Cubit reference pages lost the node-order
+diagrams through HTML->markdown summarization), the mapping was derived
+empirically: a real mesh-only Exodus file was found on disk
+(`Code/mpcMaker/src/TestFiles/1x2x10_beam_Left.g`, an unrelated project of
+the user's, copied into `tests/fixtures/exodus/beam_hex8.g`), its
+`coord`/`connect1` dumped directly, and the resulting node-to-corner mapping
+hand-verified against `elements.Brick8`'s own (already-tested) natural
+coordinates. `TET_4`/`WEDGE_6` use the identity mapping (the standard
+Exodus/VTK/CGNS convention already matches our own structure: tet node 3 is
+the apex opposite the 0-1-2 base, wedge nodes 0-1-2/3-4-5 are the bottom/top
+triangles) -- no real sample file was available for these, a materially
+weaker form of verification than BRICK_8's.
+
+**A real, calibration bug found and fixed during this**: the corner-order
+sanity check (`_check_nonzero_volume`, run on every element on every read)
+was originally written to require a *specific sign* ("positive volume"),
+calibrated so `elements.py`'s own reference node order counted as positive.
+That calibration was wrong for `BRICK_8`: the real file's verified-correct
+mapping legitimately has ONE natural-coordinate axis reflected relative to
+`elements.py`'s reference ordering (both are valid, non-degenerate elements
+-- see below), so it produced the *opposite* sign and tripped the check as
+a false positive. Root cause understood in the process: DDSim's actual use
+of shape functions (Newton iteration for natural coordinates, then
+interpolation) only needs the element's Jacobian to be *non-singular* --
+it never depends on a particular handedness/sign convention, unlike e.g. a
+stiffness-matrix assembly that integrates a signed Jacobian. A pure
+single-axis reflection of the natural-coordinate labeling reconstructs the
+exact same physical element and gives the exact same interpolated values;
+it just flips the sign of a volume formula that assumes one specific
+labeling. Fixed by relaxing the check to "non-zero" (catches a genuinely
+garbled/self-intersecting node order, which is the real risk) rather than
+"a specific sign" -- `test_check_nonzero_volume_accepts_our_own_reference_orderings`
+locks this in.
+
+### What's tested
+
+* `tests/fixtures/exodus/beam_hex8.g` (the real file): connectivity/coordinate
+  adjacency structure (not a fixed axis assumption, which a different real
+  file need not share -- see the test's docstring) and non-zero volume.
+* Write -> read round trips for all three supported types (geometry, element
+  connectivity, and stress, which `write_exodus` writes automatically under
+  the same canonical names `read_exodus` looks for -- this is what let the
+  read side get tested without a real stress-bearing sample file).
+* A full DDSim crack-growth run (`test_exodus_end_to_end.py`, a single-BRICK_8
+  cube with `example1`'s exact physical setup, since `example1` itself uses
+  quadratic tets): real computed life -> `ToExodusFile` -> read back -> exact
+  match, plus confirming un-run nodes come back as NaN (masked in ParaView),
+  distinct from `DamMo.HighLife` (a node that ran and never failed).
+
+### Also fixed while touching `DamMo.ToMAPFile`
+
+It referenced a bare `HighLife` instead of `self.HighLife` on its two
+sentinel-value lines -- a latent `NameError` on the "no valid life computed"
+path, never exercised by the test suite before now. Both `ToMAPFile` and the
+new `ToExodusFile` now share one `DamModel.LifeValues(set)` helper.
+
+### CLI
+
+`-exodus <path>` (read mesh + stress from an Exodus file instead of RDB;
+`.par` still comes from the usual `-base`/`-conpath`/`-parpath`) and
+`-exodus_out <path>` (write predicted life as an Exodus nodal variable, at
+the same point `-sc`/`ToMAPFile` runs). Not yet wired into the `-DB`/parallel
+code paths, which are being redesigned in the upcoming multiprocessing pass
+anyway.

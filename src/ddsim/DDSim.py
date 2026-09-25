@@ -79,6 +79,11 @@ def HelpPrints():
     print("           string to indicate name and location of sview file. ")
     print(" -cf -> prints crack front points to a file named <filename>.front")
     print("        ONLY use this for single doid runs.")
+    print(" -exodus <path> -> read the finite element model from an Exodus II")
+    print("           file instead of the default RDB ASCII format. Material")
+    print("           parameters still come from the usual .par file.")
+    print(" -exodus_out <path> -> write predicted life as an Exodus II nodal")
+    print("           variable (\"life\"), viewable directly in ParaView etc.")
     
 
 #############
@@ -637,13 +642,27 @@ def TakeArgv():
 
     crack_front=0
     if "-cf" in sys.argv: crack_front=1
-    
+
+    # -exodus <path> means read the finite element model (mesh + stress) from
+    # an Exodus II file instead of the RDB ASCII format (.con/.nod/.sig/.smp).
+    # Material parameters still come from the usual .par file.
+    exodus_in=None
+    if "-exodus" in sys.argv:
+        index=sys.argv.index('-exodus')+1
+        exodus_in=sys.argv[index]
+
+    # -exodus_out <path> means write predicted life as an Exodus II nodal
+    # variable ("life") to <path>, viewable directly in ParaView etc.
+    exodus_out=None
+    if "-exodus_out" in sys.argv:
+        index=sys.argv.index('-exodus_out')+1
+        exodus_out=sys.argv[index]
 
     return default,local_node,example,parallel,output,printall,verbose, \
            saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
            base,user_supplied_ais,user_supplied_doid,Int_type,\
            pickled_list,var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW, \
-           data_base,crack_front
+           data_base,crack_front,exodus_in,exodus_out
 
 #############
 
@@ -1416,7 +1435,7 @@ def main():
     saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
     base,user_supplied_ais,user_supplied_doid,Int_type,pickled_list, \
     var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW,data_base,\
-    crack_front = TakeArgv()
+    crack_front,exodus_in,exodus_out = TakeArgv()
 
     if verbose:
         print('            ---------------------------------------------------')
@@ -1446,8 +1465,12 @@ def main():
     # read the path+filename.par file to add the parameters
     parameters = Parameters.Parameters(filename,parpath)
 
-    # read and store the finite element model
-    model = MeshTools.MeshTools(conpath+filename,'RDB')
+    # read and store the finite element model.  -exodus overrides the default
+    # RDB (.con/.nod/.sig/.smp) ASCII format with a single Exodus II file.
+    if exodus_in:
+        model = MeshTools.MeshTools(exodus_in,'EXODUS')
+    else:
+        model = MeshTools.MeshTools(conpath+filename,'RDB')
     model.SetPointInsideTolerance(1.0e-7)
 
     # make file extension  
@@ -1572,6 +1595,9 @@ def main():
         else:
             MAPFile = open(parpath+filename+'.MP','w')
             cracks.ToMAPFile(MAPFile)
+
+    if exodus_out: # -exodus_out <path>
+        cracks.ToExodusFile(exodus_out,0 if parameters.monte else None)
 
     # print crack front points to a text file named filename.front
     if crack_front: # -cf

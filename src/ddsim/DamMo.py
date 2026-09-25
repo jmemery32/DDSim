@@ -16,6 +16,7 @@ from . import DamErrors
 # John D
 from . import GeomUtils
 from . import Integration
+from . import exodus_io
 
 # give dumpfile the string name for a file and varamp will dump
 # a vs N to a file named dumpfile.  Leave as None if you do not
@@ -801,6 +802,26 @@ class DamModel:
 
 ######## DamModel
 
+    def LifeValues(self,set):
+        '''
+        Per-doid predicted life, shared by ToMAPFile and ToExodusFile: mean
+        life across Monte Carlo samples (set), or the deterministic single-run
+        Life, with self.HighLife as the sentinel for "no valid life computed".
+
+        (Bug fix, 2026: ToMAPFile used to reference a bare 'HighLife' name here
+        instead of 'self.HighLife' -- a latent NameError on the sentinel path,
+        never exercised by the original test suite. Fixed by centralizing the
+        lookup here.)
+        '''
+        values={}
+        for i in list(self.DamOro.keys()): # i = doid
+            if self.parameters.monte:
+                v=self.DamOro[i].N.SampleMean(set)
+            else:
+                v=self.DamOro[i].Life
+            values[i]=self.HighLife if v==-1.0 else v
+        return values
+
     def ToMAPFile(self,MAPFile,set):
         '''
         Prints file for contouring in MAP
@@ -809,23 +830,35 @@ class DamModel:
         set  - the set from which to write mean value for
         '''
 
-        DamKeys=list(self.DamOro.keys())
+        values=self.LifeValues(set)
+        DamKeys=list(values.keys())
         DamKeys.sort()
 
         MAPFile.write('LIFE 0'+"\n")
         for i in DamKeys: # i = doid
-            if self.parameters.monte:
-                if self.DamOro[i].N.SampleMean(set) == -1.0:
-                    MAPFile.write(str(i)+' '+str(HighLife)+"\n")
-                else:
-                    MAPFile.write(str(i)+' '+ \
-                                  str(self.DamOro[i].N.SampleMean(set))+"\n")
-            else:
-                if self.DamOro[i].Life == -1.0:
-                    MAPFile.write(str(i)+' '+str(HighLife)+"\n")
-                else:
-                    MAPFile.write(str(i)+' '+str(self.DamOro[i].Life)+"\n")
+            MAPFile.write(str(i)+' '+str(values[i])+"\n")
         MAPFile.close()
+
+######## DamModel
+
+    def ToExodusFile(self,path,set=None):
+        '''
+        Write predicted life as an Exodus II nodal variable ("life"), viewable
+        directly in ParaView (or any other Exodus-aware tool) as a contour
+        plot -- reuses the exact same per-node values as ToMAPFile.
+
+        path - output Exodus file path.  Always a NEW file; the mesh this
+               model was built from (RDB or Exodus) is never modified.
+        set  - the Monte Carlo set to use (ignored in deterministic mode)
+
+        Nodes never run at all (not in self.DamOro) are written as NaN, which
+        ParaView shows as masked/blank -- distinct from self.HighLife, which
+        means a node WAS run and never reached failure (a real, meaningful
+        long-life value, same sentinel ToMAPFile already uses).
+        '''
+        values=self.LifeValues(set)
+        exodus_io.write_exodus(path,self.model.to_mesh_data(),{'life':values}, \
+                               default=float('nan'))
 
 ######## DamModel
 

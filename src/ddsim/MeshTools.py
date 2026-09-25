@@ -32,6 +32,7 @@ from . import ColTensor as _CT
 from . import Vec3D as _V
 from . import _kernels as _K
 from . import elements as _E
+from . import exodus_io as _exo
 from . import mesh_io as _io
 
 
@@ -60,6 +61,8 @@ class MeshTools:
         if data is None:
             if model_type == 'RDB':
                 data = _io.read_rdb(name)
+            elif model_type == 'EXODUS':
+                data = _exo.read_exodus(name)
             else:
                 raise ValueError("unsupported model type %r" % (model_type,))
         self._load(data)
@@ -155,6 +158,19 @@ class MeshTools:
     # ------------------------------------------------------------------
     # small accessors
     # ------------------------------------------------------------------
+    def to_mesh_data(self):
+        """Export the current mesh (+ stress) back out as a
+        :class:`~ddsim.mesh_io.MeshData`, e.g. to write it out with
+        :func:`ddsim.exodus_io.write_exodus` -- regardless of whether this
+        model was originally read from RDB or Exodus files."""
+        return _io.MeshData(
+            node_ids=np.array(self._node_ids, dtype=np.int64),
+            coords=self._xyz.copy(),
+            elem_ids=np.array(self._elem_ids, dtype=np.int64),
+            elem_types=[e.name for e in self._eclass],
+            connectivity=[np.array(c, dtype=np.int64) for c in self._enodes],
+            stress=self._sig.copy())
+
     def SetPointInsideTolerance(self, tol):
         self.PointInsideTol = float(tol)
 

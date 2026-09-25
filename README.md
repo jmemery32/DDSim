@@ -21,7 +21,7 @@ behavioral difference.
 
 ## Status
 
-**Level I is ported, numba-accelerated, and tested** (178 tests: unit tests
+**Level I is ported, numba-accelerated, and tested** (190 tests: unit tests
 for every module, golden-output regression against the *actual captured
 stdout of the original 2006 program*, and a validation suite against the
 published dissertation's real 140k-element coupon model). Levels II and III
@@ -29,10 +29,15 @@ were incomplete prototypes in the original work and are kept, untouched and
 unmaintained, in `legacy/level2_level3_prototype/` — not part of the
 supported package.
 
-Not yet done: an Exodus II mesh/stress reader (the current reader is the
-original ASCII "RDB" format: `.con`/`.nod`/`.sig`/`.smp`/`.edg`), and
-multiprocessing to replace the original Windows-cluster/MPI parallel workflow
-(`legacy/windows_cluster_scripts/`).
+DDSim can also read a real Exodus II stress field as input (`-exodus <path>`,
+alongside the original ASCII "RDB" format: `.con`/`.nod`/`.sig`/`.smp`/`.edg`)
+and write predicted life back out as an Exodus nodal variable
+(`-exodus_out <path>`), viewable directly as a contour plot in ParaView.
+Linear elements only for now (every real DDSim mesh uses them) — see
+`docs/PORTING_NOTES.md` for the node-order verification and scope.
+
+Not yet done: multiprocessing to replace the original Windows-cluster/MPI
+parallel workflow (`legacy/windows_cluster_scripts/`).
 
 ## Install
 
