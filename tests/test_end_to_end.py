@@ -32,12 +32,13 @@ GOLDEN = {
 LINE = re.compile(r"doid:\s+(\d+)\s+Life is:\s+(\S+)\s+WillGrow:\s+(\d+)")
 
 
-def run_driver(tmp_path, nodes, scale):
+def run_driver(tmp_path, nodes, scale, extra_args=()):
     work = tmp_path / "example1"
     shutil.copytree(EXAMPLE, work)
     proc = subprocess.run(
         [sys.executable, "-m", "ddsim.DDSim", "-base", "example1",
-         "-conpath", "./", "-parpath", "./", "-v", "-doid_list", nodes, "-scale", scale],
+         "-conpath", "./", "-parpath", "./", "-v", "-doid_list", nodes, "-scale", scale,
+         *extra_args],
         cwd=work, capture_output=True, text=True, timeout=600)
     assert proc.returncode == 0, proc.stderr[-2000:]
     return {int(d): (float(life), int(wg)) for d, life, wg in LINE.findall(proc.stdout)}

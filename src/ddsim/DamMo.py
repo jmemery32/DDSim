@@ -51,64 +51,116 @@ def DumpFile(xlist,ylist,filename):
     fil.write("# *** \n")
     fil.close()
 
+class _StrippedDamEl:
+    '''
+    Picklable stand-in for a DamClass.Fellipse/Hellipse/Qellipse instance,
+    used only after a doid's processing is fully complete and it's about to
+    cross a process boundary (see ddsim.parallel). Every real DamEl holds a
+    direct reference to the entire shared MeshTools model (self.model),
+    which is what makes a live DamEl catastrophically expensive to pickle --
+    but every *downstream* output method only ever reads two small facts off
+    it: WriteRotations reads DamEl[0].Rotation, WriteFinalAs reads
+    DamEl[-1].GiveCurrent(). This carries just those two, so
+    DamOro[doid].DamEl can be safely replaced with a single-element list
+    (index 0 and -1 alike) -- see _DamOroContainer.StripDamElForTransport()
+    and docs/PORTING_NOTES.md. PrintDamInfo's optional full DamEl dump
+    (dam=='all') goes empty for any doid that passed through this --
+    accepted, screen-diagnostics only, not a file output.
+    '''
+    __slots__ = ('Rotation', '_af', '_bf')
+
+    def __init__(self, rotation, af, bf):
+        self.Rotation = rotation
+        self._af = af
+        self._bf = bf
+
+    def GiveCurrent(self):
+        return self._af, self._bf
+
+
+class _DamOroContainer:
+    '''
+    Module-level (not nested in DamModel) so it's picklable: a class nested
+    inside another class with a double-underscore name gets its *storage
+    key* mangled (DamModel.__dict__['_DamModel__DamOroContainer']), but its
+    __qualname__ stays the unmangled 'DamModel.__DamOroContainer' -- pickle
+    resolves classes by walking __qualname__ via getattr from the module, so
+    it looks for (and doesn't find) DamModel.__DamOroContainer and raises
+    PicklingError. A single leading underscore at module level isn't
+    mangled at any nesting depth, so this is picklable as long as DamEl
+    doesn't hold anything that isn't (see _StrippedDamEl above).
+    '''
+
+    def __init__(self,sets,samples):
+        self.ai=0.0 # store the initial crack size that gotcha!
+        self.DamEl=[] # list of damage elements for this doid
+        self.DamElLength=0 # stored length of DamEl list changes on
+           # subsequent DamMo.AddFDam() so i don't store every ai in
+           # variable amplitude loading
+        self.nextdN = 0.0 # for RK5 scheme. reset in SimDamGrowth
+
+        # initialize to something that doesn't make sense (i.e. willgrow
+        # should be -1 - compressive stress field, 0 - subcritical,
+        # 1 - will grow, 2 - unstable, 3 - change shape, 4 - outgrown
+        # surroundings.  Will be set to appropriate value in SimDamGrowth)
+        self.WillGrow = 10
+        self.Life=-1
+
+        # use a Statistic.Stat class to store and operate on sets of
+        # samples of random variables.
+        self.N = Statistic.StatN(sets,samples)
+
+        # self.ProbFail is filled by DamModel.CalcStats() as:
+        # [[Pf11, Pf12, Pf13...], [Pf21, Pf22, Pf23...],...]
+        # where the first set of probs corresponds to the probability of
+        # failure of the first set of samples and
+        # P(N<=ncr1) = Pf11
+        # whereas the prob of failure for the second set of samples is:
+        # P(N<=ncr1) = Pf21
+        self.ProbFail = []
+
+        # 'check' = 0.0 - initially 0.0 self.N is not populated.
+        #           Switch to 1.0 when DamModel.UpdateSample is first
+        #           called.
+        self.check = 0.0
+
+    def Flush(self):
+        '''
+        reset some of the parameters for monte carlo variable amplitude
+        problems
+        '''
+        self.ai=0.0
+        self.DamEl=[]
+        self.DamElLength=0
+        self.WillGrow = 10
+        self.Life=-1
+
+    def StripDamElForTransport(self):
+        '''
+        Mutates self.DamEl down to a picklable single-element stand-in, for
+        returning this doid's results across a ddsim.parallel worker process
+        boundary. Call only after this doid's SimDamGrowth + all
+        UpdateSample calls are done: UpdateSample resolves an initial crack
+        size against the live, shared DamModel.ais at call time, but nothing
+        after that point ever needs the live DamEl again.
+        '''
+        rotation = self.DamEl[0].Rotation
+        af, bf = self.DamEl[-1].GiveCurrent()
+        self.DamEl = [_StrippedDamEl(rotation, af, bf)]
+
+
 class DamModel:
 
     #------------------------------------------------------
     # Embedded Class
     #------------------------------------------------------
 
-    class __DamOroContainer:
-
-        def __init__(self,sets,samples):
-            self.ai=0.0 # store the initial crack size that gotcha! 
-            self.DamEl=[] # list of damage elements for this doid
-            self.DamElLength=0 # stored length of DamEl list changes on
-               # subsequent DamMo.AddFDam() so i don't store every ai in
-               # variable amplitude loading
-            self.nextdN = 0.0 # for RK5 scheme. reset in SimDamGrowth
-
-            # initialize to something that doesn't make sense (i.e. willgrow
-            # should be -1 - compressive stress field, 0 - subcritical,
-            # 1 - will grow, 2 - unstable, 3 - change shape, 4 - outgrown
-            # surroundings.  Will be set to appropriate value in SimDamGrowth)
-            self.WillGrow = 10 
-            self.Life=-1
-
-            # use a Statistic.Stat class to store and operate on sets of
-            # samples of random variables.
-            self.N = Statistic.StatN(sets,samples)
-
-            # self.ProbFail is filled by DamModel.CalcStats() as:
-            # [[Pf11, Pf12, Pf13...], [Pf21, Pf22, Pf23...],...]
-            # where the first set of probs corresponds to the probability of
-            # failure of the first set of samples and
-            # P(N<=ncr1) = Pf11
-            # whereas the prob of failure for the second set of samples is:
-            # P(N<=ncr1) = Pf21
-            self.ProbFail = [] 
-
-            # 'check' = 0.0 - initially 0.0 self.N is not populated.  
-            #           Switch to 1.0 when DamModel.UpdateSample is first
-            #           called. 
-            self.check = 0.0
-
-        def Flush(self):
-            '''
-            reset some of the parameters for monte carlo variable amplitude
-            problems
-            '''
-            self.ai=0.0 
-            self.DamEl=[] 
-            self.DamElLength=0 
-            self.WillGrow = 10 
-            self.Life=-1
-
 ######## DamModel
 
     def AddDamOro(self,doid,ais=None):
-        self.DamOro[doid] = self.__DamOroContainer(self.parameters.sets, \
-                                                   self.parameters.samples)
-        if ais: self.ais=ais # so can change from one doid to the next... 
+        self.DamOro[doid] = _DamOroContainer(self.parameters.sets, \
+                                             self.parameters.samples)
+        if ais: self.ais=ais # so can change from one doid to the next...
 
 ######## DamModel
 
@@ -746,21 +798,37 @@ class DamModel:
 
         #end while
 
-        # if will_grow = 0 or 2, compute life at DamOro and 
+        # if will_grow = 0 or 2, compute life at DamOro and
         # set self.DamOro[doid].Life and update HighLife and LowLife
         if N > 0.0:
 
             if N > parameters.N_max:
                 N = parameters.N_max*1.01
-                self.DamOro[doid].Life=N
+
+            # .Life is unconditional (this doid's own computed N, always) --
+            # previously it was only set inside the three ifs below, so a
+            # doid whose N was neither capped at N_max nor a new model-wide
+            # running max/min never got .Life set at all (stayed at the
+            # container's -1 "never computed" default, later silently
+            # reported as self.HighLife via LifeValues's fallback, or
+            # literally -1 via NFile's non-monte branch). Confirmed present,
+            # byte-for-byte, in the original 2007 source (commit bd2d7d0) --
+            # not introduced by the port. Only affects deterministic
+            # (non-Monte-Carlo) runs: Monte Carlo life comes from a separate
+            # object (DamOro[doid].N, via SampleMean) and never touches
+            # .Life. Also a correctness prerequisite for multiprocessing:
+            # pre-fix, .Life depended on what order *other* doids were
+            # processed in (whether this one beat the running record at the
+            # time), which doesn't even make sense once doids are split
+            # across worker processes with their own independent
+            # HighLife/LowLife. See docs/PORTING_NOTES.md.
+            self.DamOro[doid].Life=N
 
             if N > self.HighLife:
                 self.HighLife = N
-                self.DamOro[doid].Life=N
 
             if N < self.LowLife and will_grow != 0:
                 self.LowLife = N
-                self.DamOro[doid].Life=N
 
         # if N is less than one then the crack was never grown.  this could
         # happened for two reasons.  1) Ki was never larger than Kth or 2)
@@ -799,6 +867,29 @@ class DamModel:
             for item in line:
                 f.write(str(item)+' ')
             f.write("\n")
+
+######## DamModel
+
+    def RefreshLifeBounds(self):
+        '''
+        Recompute self.HighLife/self.LowLife from self.DamOro. Needed after
+        a ddsim.parallel multiprocessing merge, where every doid was
+        actually processed by some worker's own DamModel instance with its
+        own process-local running trackers that started fresh (-1.0/1e100)
+        -- the parent's own HighLife/LowLife never saw any of that, and
+        wouldn't reflect the real merged result without this. A no-op-ish
+        safety net when called after a normal serial run (every doid's
+        SimDamGrowth call already updated these directly). Since the
+        SimDamGrowth .Life fix (see docs/PORTING_NOTES.md), LifeValues's
+        `self.HighLife if v==-1.0 else v` sentinel fallback is dead code in
+        practice -- every processed doid's .Life is a real value -- but this
+        keeps HighLife/LowLife themselves internally consistent for any
+        other code that reads them directly.
+        '''
+        lives = [e.Life for e in self.DamOro.values() if e.Life != -1]
+        if lives:
+            self.HighLife = max(self.HighLife, max(lives))
+            self.LowLife = min(self.LowLife, min(lives))
 
 ######## DamModel
 
@@ -895,7 +986,7 @@ class DamModel:
     def __init__(self,model,node_list,verbose,verify,extension,saveall, \
                  parameters,DebugGeomUtils=False,SVIEW=False, \
                  integration='RK5'):
-        self.DamOro = {} # keys = doid, values = __DamOroContainer instance
+        self.DamOro = {} # keys = doid, values = _DamOroContainer instance
         self.node_list = node_list # ordered list of all node ids in vol. mesh
         self.LowLife = 1e+100 # fictitously high numba
         self.HighLife = -1.0 # Miller time!

@@ -21,7 +21,7 @@ behavioral difference.
 
 ## Status
 
-**Level I is ported, numba-accelerated, and tested** (199 tests: unit tests
+**Level I is ported, numba-accelerated, and tested** (215 tests: unit tests
 for every module, golden-output regression against the *actual captured
 stdout of the original 2006 program*, and a validation suite against the
 published dissertation's real 140k-element coupon model). Levels II and III
@@ -40,8 +40,13 @@ SIPS3002 model. `ddsim.tools.n_to_exodus` visualizes real *already-computed*
 result files (`.N`, from the actual 2007 parallel runs) the same way, with no
 crack growth simulation involved.
 
-Not yet done: multiprocessing to replace the original Windows-cluster/MPI
-parallel workflow (`legacy/windows_cluster_scripts/`).
+DDSim can run a doid list across multiple worker processes on a single
+machine (`-j <N>`), replacing the original Windows-cluster/MPI parallel
+workflow (`legacy/windows_cluster_scripts/`) entirely — no shared drive, MPI,
+or manual partition/merge step needed. `-j` absent or `1` is exactly today's
+serial behavior; see `docs/PORTING_NOTES.md` for the design and two
+pre-existing 2007 bugs found and fixed along the way (both narrowly scoped —
+neither affects any previously-validated result).
 
 ## Install
 
@@ -78,7 +83,8 @@ ddsim -base example1 -conpath examples/example1/ -parpath examples/example1/ \
 ```
 
 `ddsim -help` lists the command-line switches (input file selection, Monte
-Carlo vs. deterministic, constant vs. variable amplitude, output options).
+Carlo vs. deterministic, constant vs. variable amplitude, output options,
+`-j <N>` for multiprocessing).
 
 ## Repository layout
 
@@ -89,7 +95,7 @@ Carlo vs. deterministic, constant vs. variable amplitude, output options).
 | `tests/` | The pytest suite, incl. `tests/fixtures/sif_verification/` (small non-proprietary verification cubes with captured original-program output). |
 | `examples/` | A small runnable example case. |
 | `docs/` | `architecture.md` (module map), `PORTING_NOTES.md` (the full porting history), `papers/` (reference PDFs). |
-| `legacy/` | Historical, unmaintained material kept for reference: the original compiled Windows/Python-2.4 binaries (`win32-py24/`), the Windows/MPI cluster scripts being replaced by multiprocessing (`windows_cluster_scripts/`), the incomplete Level II/III prototypes (`level2_level3_prototype/`), pre-pytest ad hoc test scripts (`adhoc_test_scripts/`), and ported-but-unused modules (`unused_modules/`). |
+| `legacy/` | Historical, unmaintained material kept for reference: the original compiled Windows/Python-2.4 binaries (`win32-py24/`), the Windows/MPI cluster scripts replaced by `-j` multiprocessing (`windows_cluster_scripts/`), the incomplete Level II/III prototypes (`level2_level3_prototype/`), pre-pytest ad hoc test scripts (`adhoc_test_scripts/`), and ported-but-unused modules (`unused_modules/`). |
 | `reference/cpp/` | **Not tracked by git.** The original C++ Python-extension sources and their Cornell "FTools" support library, kept locally for cross-referencing while porting (see `docs/architecture.md`); they were never independently buildable (missing headers, Python 2 C-API) and have all been reimplemented in `src/ddsim`. |
 
 ## Testing
@@ -98,10 +104,13 @@ Carlo vs. deterministic, constant vs. variable amplitude, output options).
 pytest
 ```
 
-Two tests need real, proprietary validation data not included in this
+Five tests need real, proprietary validation data not included in this
 repository (the NGC test-coupon geometry from the dissertation's validation
 study) and are skipped unless `DDSIM_SIPS3002_DIR` points at a local copy —
-see `docs/PORTING_NOTES.md`.
+see `docs/PORTING_NOTES.md`. One additional test (the full 63,974-node
+statistical validation against the real 2007 captured results) needs a
+precomputed full-model run and is skipped unless `DDSIM_SIPS3002_FULL_N`
+also points at one.
 
 ## License
 

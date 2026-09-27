@@ -33,13 +33,17 @@ exodus_io (Exodus)  ─┘    IsPointOutsideMesh, surface normals, ...)   │
 parses arguments, builds a `MeshTools` model and a `Parameters` object, creates one
 `DamMo.DamModel`, and loops over the requested node list calling either
 `FwdDeterministic` (fixed initial flaw) or `MonteSimulation` (random/particle-filter
-initial flaws) per node.
+initial flaws) per node. `-j <N>` (`parallel.py`) runs that same per-node
+loop across `N` worker processes instead of serially in one -- see
+`docs/PORTING_NOTES.md` for the design (why per-doid results need a
+picklability fix to cross a process boundary at all) and what it replaces
+(the old Windows/MPI cluster workflow, `legacy/windows_cluster_scripts/`).
 
 ## Module map
 
 | Module | Role | Tested |
 |---|---|---|
-| `DDSim.py` | CLI entry point / driver loop | end-to-end (`test_end_to_end.py`, `test_sif_verification_golden.py`, `test_exodus_end_to_end.py`) |
+| `DDSim.py` | CLI entry point / driver loop | end-to-end (`test_end_to_end.py`, `test_sif_verification_golden.py`, `test_exodus_end_to_end.py`, `test_parallel.py`, `test_sips3002_full_validation.py`) |
 | `Parameters.py` | Reads `.par` files | yes |
 | `mesh_io.py` | Reads the RDB mesh/stress ASCII format (`.con/.nod/.sig/.smp/.edg`) into `MeshData` | yes |
 | `exodus_io.py` | Reads/writes Exodus II (linear elements only: `TET_4`/`WEDGE_6`/`BRICK_8`) into/from the same `MeshData`; `DamMo.ToExodusFile` writes life predictions as a nodal variable | yes, incl. against a real sample file |
@@ -51,6 +55,7 @@ initial flaws) per node.
 | `Vec3D.py`, `ColTensor.py`, `JohnsVectorTools.py` | Vector / symmetric-tensor / list arithmetic. Replace `Vec3D.pyd`, `ColTensor.pyd`, `JohnsVectorTools.pyd` | yes |
 | `DamClass.py` | The three crack-geometry classes (`Fellipse` embedded, `Hellipse` surface, `Qellipse` corner/edge) and their stress-intensity-factor and growth logic | yes, incl. golden-output regression against the pre-port 2006 program |
 | `DamMo.py` | `DamModel`: owns the mesh + per-node damage history, drives `GrowDam`/`SimDamGrowth`; `ToMAPFile`/`ToExodusFile` write results | yes |
+| `parallel.py` | `-j <N>`: partitions the doid list across `N` worker processes, reusing `DDSim.MonteSimulation`/`FwdDeterministic` directly, and merges results back into one `DamModel.DamOro` so every existing output method works unchanged | yes |
 | `DamHistory.py`, `DamErrors.py` | Small history container / exception classes | yes |
 | `MydadN.py` | NASGRO crack-growth rate + Willenborg retardation (`dadN`/`Willenborg` classes). Replaces the compiled `dadN.pyd` | yes |
 | `Newton.py` | Generic Newton solve used by `Willenborg`'s effective-R iteration | yes |

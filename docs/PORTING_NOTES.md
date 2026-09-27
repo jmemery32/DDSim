@@ -370,6 +370,217 @@ new `ToExodusFile` now share one `DamModel.LifeValues(set)` helper.
 `-exodus <path>` (read mesh + stress from an Exodus file instead of RDB;
 `.par` still comes from the usual `-base`/`-conpath`/`-parpath`) and
 `-exodus_out <path>` (write predicted life as an Exodus nodal variable, at
-the same point `-sc`/`ToMAPFile` runs). Not yet wired into the `-DB`/parallel
-code paths, which are being redesigned in the upcoming multiprocessing pass
-anyway.
+the same point `-sc`/`ToMAPFile` runs). Works with `-j` too -- `-exodus`
+is threaded straight through to each worker's own model construction (see
+the Multiprocessing section below).
+
+## Multiprocessing (`-j`, `parallel.py`) -- replaces the Windows/MPI cluster workflow
+
+The original (2007) parallel execution model needed a Windows cluster: a
+shared network drive, `mpirun`, an `MSTI_RANK` env var, and
+`legacy/windows_cluster_scripts/*.bat` to partition a doid list into
+`node_partition.<rank>` files and merge per-rank output text files back
+together afterward (`ddsim.tools.twins`, still kept -- see below). `-j <N>`
+replaces all of that with real multiprocessing on a single machine, in one
+process's memory: partition the doid list, run each partition's crack-growth
+simulation in its own worker process, merge the results, write the exact
+same output files. `-p`/`-DB`/`-pn`/`-pick_list` and the code paths behind
+them (`ParallelInitializeStuff`, `DataBaseInitializeStuff`,
+`LocalNodeInitializeStuff`, `DoParallel`) are removed entirely --
+`legacy/windows_cluster_scripts/` and `ddsim.tools.twins` are untouched
+(twins is still useful for merging old already-captured cluster output, like
+the real SIPS3002 `.N` files used elsewhere in this repo).
+
+### Why a worker's results can't just cross a process boundary as-is
+
+* `DamModel`'s per-doid container class was a **name-mangled nested class**
+  (`class __DamOroContainer` inside `class DamModel`). A double-underscore
+  identifier gets its *storage key* mangled by the compiler at any nesting
+  depth (`DamModel.__dict__['_DamModel__DamOroContainer']`), but the class
+  object's own `__qualname__` stays the unmangled `'DamModel.__DamOroContainer'`
+  -- `pickle` resolves classes by walking `__qualname__` via `getattr` from
+  the module, so it looks for (and doesn't find) `DamModel.__DamOroContainer`
+  and raises `PicklingError`. Fixed by moving it to module level as
+  `_DamOroContainer` (a single leading underscore isn't mangled at any
+  nesting depth).
+* Every `DamEl` entry (`DamClass.Fellipse`/`Hellipse`/`Qellipse`) holds a
+  **direct reference to the entire shared `MeshTools` model**
+  (`self.model = model`). Once the container rename above made a
+  `DamOro[doid]` picklable *at all*, it turned out pickling one wasn't an
+  *error* -- it succeeded, just catastrophically bloated: a full independent
+  copy of the whole mesh gets dragged along per doid (measured: 104KB for one
+  doid on a 12-element toy mesh, more than the whole mesh pickled alone,
+  13.7KB -- and per-*doid*, not per-worker, on a real 172k-node mesh). But
+  everything downstream only ever reads two small facts off `DamEl`:
+  `WriteRotations` reads `DamEl[0].Rotation`; `WriteFinalAs` reads
+  `DamEl[-1].GiveCurrent()` (an `(af,bf)` tuple). Fixed by
+  `_DamOroContainer.StripDamElForTransport()`, called once a doid's
+  processing is fully done (all `UpdateSample`/`CalcStats` calls complete --
+  `UpdateSample` needs the live, shared `DamModel.ais` at call time to
+  resolve a crack size to a particle RID, so extraction must happen after,
+  not during): replaces `DamOro[doid].DamEl` with a single-element list
+  holding `_StrippedDamEl`, a tiny picklable stand-in carrying just those two
+  facts.
+* **Accepted gaps**, both screen-diagnostics only (not file output), both
+  pre-existing/documented behavior otherwise: `PrintDamInfo(dam='all')`'s
+  full `DamEl` history dump comes back empty for any `-j`-processed doid;
+  `FrontPoints` (already documented as "for single doid runs only") still
+  runs but prints one point instead of full crack-front history for a
+  `-j`-processed doid.
+* `-DebugGeomUtils`/`-SVIEW` fire once, at `DamModel.__init__`, off the mesh
+  itself -- not per-doid -- so the parent's own unconditionally-built
+  `DamModel` in `main()` already handles them correctly regardless of `-j`;
+  workers always build their own `DamModel` with these off.
+* The old `errfile_name`-based error-file write (`DamModel.BuildDkva`)
+  belongs exclusively to the dead `Kva_History`/`-Simp` path (disabled via
+  `sys.exit()` before it would ever run). `SimDamGrowth` takes an
+  `errfile_name` parameter but never uses it -- confirmed no multi-writer
+  race exists in the code actually being parallelized.
+
+### `DamMo.SimDamGrowth`'s `.Life` bug (found while designing this, fixed as a prerequisite)
+
+`.Life` used to only be assigned inside three separate conditionals (`N >
+parameters.N_max`, `N > self.HighLife`, `N < self.LowLife and will_grow !=
+0`) -- so a doid whose computed life was neither capped nor a new model-wide
+running max/min for the whole `DamModel` instance never got `.Life` set at
+all (stayed at the container's `-1` default, later silently reported as
+`self.HighLife` via `LifeValues`'s fallback, or literally `-1` via `NFile`'s
+non-monte branch). Confirmed byte-for-byte identical in the very first
+"Initial commit from grad school source" (`bd2d7d0`) -- an original-2007
+bug, not port-introduced. Confirmed to **only affect deterministic
+(non-Monte-Carlo) runs**: Monte Carlo life values come from a separate
+object (`DamOro[doid].N`, via `SampleMean`) and never touch `.Life`, so none
+of the already-produced/validated real SIPS3002 Monte Carlo results are
+affected. Fixed by making `.Life=N` (capped the same way as before)
+unconditional whenever `N>0.0`; `HighLife`/`LowLife` remain separate running
+trackers. Also a correctness *prerequisite* for multiprocessing: pre-fix,
+`.Life` depended on what order other doids were processed in, which doesn't
+even make sense once doids are split across worker processes with their own
+independent, process-local `HighLife`/`LowLife`. `DamModel.RefreshLifeBounds()`
+(new) recomputes `HighLife`/`LowLife` from the merged `DamOro` after a `-j`
+run, since each worker's own trackers were process-local -- cheap defensive
+robustness; after this fix it's a no-op in practice, since every processed
+doid's `.Life` is already correct.
+
+### `Var_Amplitude` bugs (found and fixed alongside; NOT wired into `-j`)
+
+Two bugs, both original-2007, both unexercised by any test before now
+(`-VarAmp`/variable-amplitude loading is unvalidated/unused so far -- all
+real validation is constant-amplitude):
+
+1. References `verify` at four call sites but never receives it as a
+   parameter, and no module-level `verify` global exists -- an immediate
+   `NameError` on the very first `AddFDam` call, i.e. any real `-VarAmp`
+   invocation crashed. Fixed by adding `verify` to its signature.
+2. Its deterministic branch computed a life (`N_tot`) but never assigned
+   `cracks.DamOro[doid].Life`, unlike its two Monte Carlo branches just
+   above it. The naive fix (`Life = N_tot` unconditionally) is *wrong*,
+   though: `VarAmp` returns `N_tot=-1` as its own legitimate sentinel for
+   "reached `N_max` without growing" (setting `WillGrow` to `0`, or `-1` for
+   a compressive/never-grew field) -- exactly the case the Monte Carlo
+   branches already special-case (`Life = N_max` -- the local
+   `1.01*parameters.N_max` -- whenever `WillGrow in (-1, 0)`, else
+   `Life = N_tot`). Fixed by mirroring that same pattern in the
+   deterministic branch, so `-1` from `VarAmp` never collides with
+   `_DamOroContainer`'s own unrelated `-1` "never computed" sentinel.
+
+`-VarAmp` remains serial-only (`-j` is not wired into `Var_Amplitude`) --
+deliberately deferred, since it's unvalidated/unused; only `Fwd_Integration`'s
+loop (deterministic + constant-amplitude Monte Carlo) got multiprocessing
+support in this pass.
+
+### Design
+
+`parallel.py`: `partition_doids` is the in-memory equivalent of the old
+`DoParallel` -- randomly shuffles the doid list (its only load-balancing
+heuristic, ported verbatim) then splits into `num_workers` contiguous,
+individually-sorted chunks. A `concurrent.futures.ProcessPoolExecutor`
+initializer builds each worker's own `MeshTools`+`Parameters`+`DamModel`
+**once per worker process** (not once per task), amortizing the mesh-load
+cost (~11s for the real SIPS3002 model) across every doid that worker
+handles. Each task reuses `DDSim.MonteSimulation`/`FwdDeterministic`
+directly -- the exact same dispatch `Fwd_Integration`'s serial loop body
+does -- so `-j>=2` runs the identical per-doid code as `-j 1`/no `-j`, just
+split across processes; `-j` absent or `1` takes today's original code path
+completely unchanged. The parent merges every worker's `StripDamElForTransport`-ed
+results into its own `DamModel.DamOro`, so every existing output method
+(`NFile`, `WriteRotations`, `WriteInitialAs`, `WriteFinalAs`, `ToMAPFile`,
+`ToExodusFile`, `LifeValues`, `NToPickle`) works unchanged against it. `-sv`
+output is written once, in a batch, after all workers finish (one call per
+doid, not the `'all'` batch form of `WriteInitialAs`/`WriteFinalAs`/
+`WriteRotations`, which writes an extra header line the serial per-doid
+loop never did) -- final file *contents* are identical to a serial `-sv`
+run; the only behavior difference is that a crash mid-run no longer leaves
+partial output for doids that had already completed.
+
+### Verified
+
+* `tests/test_parallel.py`: `partition_doids` coverage/determinism;
+  `StripDamElForTransport` pickle round trip (and that pickling a live,
+  unstripped `DamOro[doid]` succeeds but balloons in size -- not an error,
+  a cost problem); the `SimDamGrowth`/`Var_Amplitude` bug fixes directly;
+  `-j` vs. no-`-j` on `example1` (both the golden doid set and the
+  8-corner-symmetry case, more doids than workers) give bit-identical
+  results; `-sv` output files (`.N`/`.ai`/`.af`/`.ori`) match byte-for-byte
+  between serial and `-j` runs, for both a deterministic and a Monte Carlo
+  case (same `-seed`).
+### Full validation against the real 2007 captured results (`test_sips3002_full_validation.py`)
+
+An earlier draft of this section claimed a "pre-existing numerical
+sensitivity" causing two independent plain serial runs of the same real
+doids to disagree by several percent, based on comparing `-v` stdout prints
+across two terminal invocations. **That claim was wrong** -- rechecked
+properly (comparing actual `.N` file contents, not stdout) with three
+independent full-precision runs on the real model's known hot-spot cluster
+(two separate serial invocations, one `-j 4` run): all three produced
+**bit-for-bit identical** `.N` output. There is no run-to-run
+nondeterminism in the crack-growth integration, with or without `-j`.
+
+What's actually going on, established via a full real-data comparison
+(`ddsim -base SIPS3002 -conpath .../ConstantAmplitude/ -parpath
+.../10000_Particles/ -S -sv -j 4`, all 63,974 real candidate nodes, compared
+against the actual captured `3002_open_CA_10000Parts_070530.N`):
+
+* **96.0%** of all 63,974 nodes match to machine precision (relative
+  difference <= 1e-9); **99.4%** within 1%; **99.998%** within 10%. Mean
+  *signed* relative difference across the whole model: ~1.3e-6 -- no
+  systematic bias in either direction. Every doid present in one file is
+  present in the other (zero missing/extra nodes both ways).
+* The nodes with a meaningful difference (~350 of 63,974) are 99.4%
+  concentrated in nodes with many mapped particles -- i.e. the same
+  peak-stress hot-spot cluster `test_sips3002_sanity.py` already validates
+  the mesh/stress reading against (Sec. 6.1). None of this ~0.6% of nodes
+  falling outside 1% agreement is scattered randomly across the model.
+* **Root cause, traced concretely for the worst offender** (doid 141713,
+  14% off on the mean across ~6,000-8,000 particles): individual particle
+  IDs (RIDs) common to both the new and the historical output do *not*
+  agree well node-for-node either (e.g. RID 49839: 70,247 vs. 40,923) --
+  ruling out "same inputs, different floating-point rounding" as the
+  explanation. Checked why: RID 49839's initial crack size exists in the
+  *current* `sips3002.rnd` but is **completely absent** from
+  `sips3002.rnd.old`. Since the historical `070530.N` result reports a real
+  value for this RID, **neither `.rnd`/`.map` file preserved on disk today
+  is a byte-exact match to whatever snapshot actually generated that
+  historical run** -- a third, no-longer-preserved version was used back in
+  2007 (the `readme` in `10000_Particles/` only documents an `.old` vs.
+  "current" split at "before/after May 29, 2007", not this finer-grained
+  provenance gap). This also explains a separate, smaller finding: 6 of the
+  63,974 nodes report "no particles nearby" (`rid=-1`, life=`N_max`) in the
+  historical output while the *current* `sips3002.map` lists real particles
+  for those same doids -- directly confirmed by grepping the map file.
+* **Conclusion**: the rewrite (multiprocessing and the bug fixes alike) is
+  correct and fully deterministic; the residual disagreement in a small,
+  concentrated subset of nodes is bounded by *input-data provenance*
+  (`.rnd`/`.map` files that are the best available reconstruction of 2007's
+  inputs, not a verified byte-exact copy), not by anything in the code.
+
+This is now a permanent, two-tier regression test
+(`tests/test_sips3002_full_validation.py`, gated like
+`test_sips3002_sanity.py` on `DDSIM_SIPS3002_DIR`): a fast (~20s) check that
+actually runs `-j 2` against the real particle-filter inputs for a small
+representative sample (the hot-spot cluster + 20 real sentinel nodes) and
+compares against the historical result, plus a determinism check (serial vs
+`-j 4` on the same real doids, asserting bit-identical output). A third,
+separately-gated test (`DDSIM_SIPS3002_FULL_N`, pointing at a *precomputed*
+full-model `.N` file -- it never runs the ~1hr simulation itself) checks the
+whole-model statistics above against the thresholds established here.

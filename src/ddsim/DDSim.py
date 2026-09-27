@@ -6,7 +6,7 @@ from . import Parameters
 from . import Vec3D
 from . import ColTensor
 import numpy as np
-import math, os, pickle, random
+import math, random
 from . import Statistic # for plotting cdf of ai's.
 
 # verification flag --> makes some things print automatically
@@ -45,15 +45,16 @@ def HelpPrints():
     print('         (not for parallel jobs, must include subdirectory \\inter)')
     print(' -L    -> limit the simulation spatially (will prompt for limits)')
     print(' -S    -> limit the simulation to surface nodes only')
-    print(' -p    -> parallel job (include jobname.bat file in job directory)')
     print(' -usa  -> means use a user supplied ais by *.rnd file (binary no ')
     print('          longer supported!)')
-    print(' -DB   -> means a parallel run from SQL where the random initial ')
-    print('          crack sizes are supplied by the database')
     print(' -doid_list -> to specify node ids to run ddsim for.  Use #,# ')
     print('               i.e. comma, no spaces! ')
-    print(' -pick_list -> to specify a pickled list of doids.  Follow key with')
-    print('               filename.extentions')
+    print(' -j    -> number of worker processes for a local multiprocessing')
+    print('          run (default 1, serial -- unchanged from previous')
+    print('          versions). Each worker builds its own copy of the mesh,')
+    print('          so -j only pays off once doid_list is large enough for')
+    print('          per-doid compute time to dominate that one-time cost.')
+    print('          Replaces the old -p/-DB/Windows-cluster workflow.')
     print(' ')
     print(" Integrations: Default is Constant amplitude, Adaptive time step,")
     print(" RK-5") 
@@ -88,123 +89,7 @@ def HelpPrints():
 
 #############
 
-def LocalNodeInitializeStuff(model,extension,parameters):
-    node_list = model.GetNodeList()
-
-    # node_partition.%MSTI_RANK% should be there... 
-    tfile=open('node_partition.'+extension,'r')
-    doid_list=[]
-    lines=tfile.readlines()
-    for line in lines:
-        doid_list+=[int(line)]
-    tfile.close()
-
-    # input.rnd should be here.  map for rid -> ai
-    tfile=open("input.rnd",'r')
-    ais=Statistic.Stata(parameters.sets,parameters.samples)
-    for i in range(parameters.sets):
-        ais.UpdateSet()
-        for j in range(parameters.samples):
-            l=tfile.readline()
-            l=l.split()
-            ais.UpdateSamples(float(l[1]),i,int(l[0]))
-    tfile.close()
-
-    ais_map = None # remains None unless monte = 2
-    if parameters.monte == 2: 
-        # input.map should be here too. creates the map for nid -> rid
-        tfile=open("input.map",'r')
-        ais_map={}
-        tfilelist=tfile.readlines()
-        for line in tfilelist:
-            l = line.split()
-            ais_map[int(l[0])]=list(map(int,l[2:]))
-        tfile.close()
-
-    ncr=np.arange(0,parameters.N_max*1.01,1000)
-    ncr=ncr.tolist()
-
-    return doid_list,node_list,ais,ncr,ais_map
-
-#############
-
-def ParallelInitializeStuff(model,doid_range,surface,seed,parameters):
-    '''
-    called by the master node in a parallel job to:
-    1. get the list of finite element nodes
-    2. randomly chop up the list into #proc's equal lists
-    3. if monte = 1 (monte carlo simulation with random initial crack sizes
-       coming from analytical distribution) generate the initial crack sizes
-    '''
-    node_list = model.GetNodeList()
-    doid_list = MakeLists(node_list,model,doid_range,surface)
-
-    # randomly chop up the doid_list for processing... 
-    DoParallel(doid_list,node_list,seed)
-    
-    # if monte == 1, generate and write initial a's
-    #  note:  if this is run from the data_base, this list will not
-    #  get used because Gerd supplies the .rnd file...
-    if parameters.monte == 1:
-        ais = Monte(parameters.a_b,parameters.sets, \
-                                   parameters.samples,seed)
-        tfile=open(filename+'.rnd','w')
-        s=''
-        for diction in ais.rv:
-            for ai in list(diction.keys()):
-                for rid in diction[ai]:
-                    s+=str(rid)+' '+str(ai)+"\n"
-##                print s
-        s=s[0:-1]
-        tfile.write(s)
-        tfile.close()
-
-#############
-
-def DataBaseInitializeStuff(model,extension,parameters):
-    '''
-    from a process in a parallel job
-    '''
-    node_list=model.GetNodeList()
-
-    # node_partition.%MSTI_RANK% should be there... 
-    tfile=open('node_partition.'+extension,'r')
-    doid_list=[]
-    lines=tfile.readlines()
-    for line in lines:
-        doid_list+=[int(line)]
-    tfile.close()
-
-    # input.rnd should be here.  map for rid -> ai
-    tfile=open("input.rnd",'r')
-    ais=Statistic.Stata(parameters.sets,parameters.samples)
-    for i in range(parameters.sets):
-        ais.UpdateSet()
-        for j in range(parameters.samples):
-            l=tfile.readline()
-            l=l.split()
-            ais.UpdateSamples(float(l[1]),i,int(l[0]))
-    tfile.close()
-
-    ais_map = None # remains None unless monte = 2
-    if parameters.monte == 2: 
-        # input.map should be here too. creates the map for doid -> rid
-        tfile=open("input.map",'r')
-        ais_map={}
-        tfilelist=tfile.readlines()
-        for line in tfilelist:
-            l = line.split()
-            ais_map[int(l[0])]=list(map(int,l[2:]))
-        tfile.close()
-
-    ncr=np.arange(0,parameters.N_max*1.01,1000)
-    ncr=ncr.tolist()
-
-    return doid_list,node_list,ais,ncr,ais_map
-
-#############
-
-def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
+def InitializingStuff(model,user_supplied_doid,doid_range,\
                       surface,parameters,user_supplied_ais,parpath,filename,\
                       seed,savepickleall,default,example,base):
 
@@ -217,20 +102,6 @@ def InitializingStuff(model,user_supplied_doid,pickled_list,doid_range,\
         entry=sys.argv[index]
         dlist=entry.split(',')
         for dd in dlist: doid_list+=[int(dd)]
-
-    elif pickled_list:
-        index=sys.argv.index('-pick_list')+1
-        pick_list=sys.argv[index]
-        tfile=open(pick_list,'r')
-        # old code
-##        (doid_list,node_list) = cPickle.load(tfile)
-##        tfile.close()
-        # node_partition way...
-        doid_list=[]
-        lines=tfile.readlines()
-        for line in lines:
-            doid_list+=[int(line)]
-        tfile.close()
 
     else: doid_list = MakeLists(node_list,model,doid_range,surface)
 
@@ -511,18 +382,10 @@ def TakeArgv():
     base = 0
     if "-base" in sys.argv: base = 1
 
-    # -pn is flag automatically passed in for parallel jobs
-    local_node = 0
-    if "-pn" in sys.argv: local_node = 1
-
     # -eg do example1 (-d is not valid and ignored if used in conjunction
     # with -eg)
     example = 0
     if "-eg" in sys.argv: example = 1
-
-    # -p means is a parallel job
-    parallel = 0
-    if "-p" in sys.argv: parallel = 1
 
     # -o means we want to be prompted for output options
     output = 0
@@ -573,9 +436,14 @@ def TakeArgv():
     user_supplied_doid = 0
     if "-doid_list" in sys.argv: user_supplied_doid = 1
 
-    # -pick_list means use a user supplied list via pickled list
-    pickled_list = 0
-    if "-pick_list" in sys.argv:    pickled_list = 1
+    # -j <N> -> number of worker processes for a local multiprocessing run
+    # (replaces the old Windows/MPI-cluster -p/-DB/-pn workflow -- see
+    # ddsim.parallel and docs/PORTING_NOTES.md). Default 1 = today's serial
+    # behavior, unchanged.
+    num_workers = 1
+    if "-j" in sys.argv:
+        index = sys.argv.index('-j')+1
+        num_workers = int(sys.argv[index])
 
     # specify the type of integration for a costant amplitude simulation
     # default --> adaptive, 5 pnt. runga-kutta scheme
@@ -637,9 +505,6 @@ def TakeArgv():
         index = sys.argv.index('-SVIEW')+1
         SVIEW = sys.argv[index]
 
-    data_base=0
-    if "-DB" in sys.argv: data_base=1
-
     crack_front=0
     if "-cf" in sys.argv: crack_front=1
 
@@ -658,11 +523,11 @@ def TakeArgv():
         index=sys.argv.index('-exodus_out')+1
         exodus_out=sys.argv[index]
 
-    return default,local_node,example,parallel,output,printall,verbose, \
+    return default,example,output,printall,verbose, \
            saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
            base,user_supplied_ais,user_supplied_doid,Int_type,\
-           pickled_list,var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW, \
-           data_base,crack_front,exodus_in,exodus_out
+           var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW, \
+           crack_front,exodus_in,exodus_out,num_workers
 
 #############
 
@@ -986,45 +851,6 @@ def MakeLocalAis(ais,ais_map,doid):
 
 #############
 
-def DoParallel(doid_list,node_list,seed=None):
-    '''
-    subroutine that chops up the doid_list.
-    '''
-
-    # randomly scramble the doid_list; a simple measure for speedup. 
-    if seed: random.seed(seed)
-    new_doidlist=[]
-    while len(doid_list) > 0:
-        ii=random.randint(0,len(doid_list)-1)
-        new_doidlist+=[doid_list.pop(ii)]
-
-    # loop over length of machines file to build doid_pickle.*'s
-    numprocs = int(os.environ['procs'])
-    old = 0
-    for i in range(numprocs-1):
-        count = (i+1)*(len(new_doidlist)//numprocs)
-        templist=new_doidlist[old:count]
-        templist.sort()
-        tfile=open('node_partition.'+str(i),'w')
-        for no in templist:
-            tfile.write(str(no)+"\n")
-        tfile.close()
-
-        del(templist)
-        old = count
-
-    templist=new_doidlist[old:]
-    templist.sort()
-
-    tfile=open('node_partition.'+str(numprocs-1),'w')
-    for no in templist:
-        tfile.write(str(no)+"\n")
-    tfile.close()
-
-    del(templist) 
-
-#############
-
 def FwdDeterministic(cracks,doid,xyz,parameters,verbose,verify,parpath,\
                      filename,errfile_extension,scale):
 
@@ -1075,29 +901,8 @@ def Fwd_Integration(ais,model,cracks,num_bcs,parameters,verbose,\
         else: FwdDeterministic(cracks,doid,xyz,parameters,verbose,verify,\
                               parpath,filename,errfile_extension,scale)
 
-        # ---> LIfe prediction for doid complete.  Now post process! 
-        if data_base or local_node:
-            nfile=open('output.N.'+extension,'a')
-            cracks.NFile(doid,nfile)
-            nfile.close()
-
-            OrientFile = open(parpath+filename+'.ori.'+extension,'a')
-            cracks.WriteRotations(OrientFile,doid)
-            OrientFile.close()
-
-            AiFile = open(parpath+filename+'.ai.'+extension,'a')
-            cracks.WriteInitialAs(AiFile,parameters.N_max,doid)
-            AiFile.close()
-
-            AfFile = open(parpath+filename+'.af.'+extension,'a')
-            cracks.WriteFinalAs(AfFile,doid)
-            AfFile.close()
-
-            # clear the stored crap that we don't need because we will get 
-            # memory errors otherwise.  
-            del cracks.DamOro[doid]
-
-        elif cracks.saveall:
+        # ---> LIfe prediction for doid complete.  Now post process!
+        if cracks.saveall:
             nfile=open(parpath+filename+'.N','a')
             cracks.NFile(doid,nfile)
             nfile.close()
@@ -1122,7 +927,7 @@ def Fwd_Integration(ais,model,cracks,num_bcs,parameters,verbose,\
 
 #############
 
-def GetFileName(example,local_node,default,parallel,base,argv,data_base):
+def GetFileName(example,default,base,argv):
     '''
     function to return strings:
     filename
@@ -1140,22 +945,8 @@ def GetFileName(example,local_node,default,parallel,base,argv,data_base):
         conpath="h:\\users\\jme32\\research\\ureti\\" + \
                 "code\\python\\ddsimv1.4\\examples\\"
         parpath=conpath
-    # for parallel job when executed on individual nodes.
-    elif data_base:
-        filename='''input'''
-        conpath=''''''
-        parpath=conpath
-    elif local_node and default == 0: 
-        filename='''input'''
-        conpath=''''''
-        parpath=conpath
-    # for parallel job (input file names come from the batch file)
-    elif parallel:
-        filename=os.environ['job_name']
-        conpath=os.environ['PROJECT_IN']+'\\'
-        parpath=os.environ['PROJECT_OUT']+'\\'
     # a default to facilitate debugging
-    elif default and parallel == 0:
+    elif default:
 ##        filename='''coupon01'''
 ##        path='''c:\\john\\research\\SIPS\\franc3d\\coupon01\\'''
 ##        filename='''cube_20x20_pull'''
@@ -1189,16 +980,14 @@ def GetFileName(example,local_node,default,parallel,base,argv,data_base):
 
 def Var_Amplitude(ais,model,cracks,parameters,verbose,\
                  saveintermediate,parpath,conpath,filename,extension,\
-                 doid_list,errfile_extension,ncr,Scale,nore,data_base,\
-                local_node,ais_map):
+                 doid_list,errfile_extension,ncr,Scale,nore,verify,ais_map):
     ''' 
     cycle-by-cycle variable amplitude loading.  for monte carlo simulation,
     N is first computed for the largest initial crack size.  the life for the
     other initial crack sizes is computed as the number of cycles to growth to
     the next largest crack size plus the other N's
 
-    for parallel jobs, or database initiate jobs writes job_nam.N file that
-    contains:
+    with -sv, writes job_nam.N file that contains:
 
     doid rid N
 
@@ -1351,6 +1140,22 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
                            verify)
             N_tot,fin = cracks.VarAmp(doid,aR,parameters.N_max,\
                                       Spec,nore,Scale,parameters.r)
+            # (bug fix, 2026: this used to never be assigned in the
+            # deterministic branch -- unlike the two Monte Carlo branches
+            # above, which set it explicitly -- so NFile's non-monte branch
+            # would silently write the -1 "never computed" sentinel for
+            # every doid processed here. Mirrors the Monte Carlo branches'
+            # own convention just above: VarAmp returns N_tot=-1 as its own
+            # sentinel for "reached N_max without growing" (WillGrow set to
+            # 0 in that case, or -1 for a compressive/never-grew field), so
+            # that must map to N_max here too, not be stored literally as
+            # -1 -- which would collide with _DamOroContainer's unrelated
+            # "never computed" default. See docs/PORTING_NOTES.md.)
+            if cracks.DamOro[doid].WillGrow == -1 or \
+               cracks.DamOro[doid].WillGrow == 0:
+                cracks.DamOro[doid].Life=N_max
+            else:
+                cracks.DamOro[doid].Life=N_tot
 
             if verbose:
                 af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
@@ -1365,28 +1170,7 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
 
         # life prediction for doid is complete ---> now postprocess.
 
-        if data_base or local_node:
-            nfile=open('output.N.'+extension,'a')
-            cracks.NFile(doid,nfile)
-            nfile.close()
-
-            OrientFile = open(parpath+filename+'.ori.'+extension,'a')
-            cracks.WriteRotations(OrientFile,doid)
-            OrientFile.close()
-
-            AFile = open(parpath+filename+'.ai.'+extension,'a')
-            cracks.WriteInitialAs(AFile,parameters.N_max,doid)
-            AFile.close()
-
-            AfFile = open(parpath+filename+'.af.'+extension,'a')
-            cracks.WriteFinalAs(AfFile,doid)
-            AfFile.close()
-
-            # clear the stored crap that we don't need because we will get 
-            # memory erros otherwise.  
-            del cracks.DamOro[doid]
-
-        elif cracks.saveall:
+        if cracks.saveall:
             nfile=open(parpath+filename+'.N','a')
             cracks.NFile(doid,nfile)
             nfile.close()
@@ -1417,12 +1201,6 @@ def main():
     '''
     main coding stars here...
     '''
-    # Fwd_Integration() reads these as bare module globals (it takes neither as
-    # a parameter, unlike Var_Amplitude()), matching the original script's
-    # behavior from when this function body was a top-level `if __name__ ==
-    # "__main__":` block instead of def main().
-    global data_base, local_node
-
     time.process_time()
 
     # a helper for the keys...
@@ -1431,11 +1209,11 @@ def main():
         sys.exit()
 
     # read and parse the command line arguements
-    default,local_node,example,parallel,output,printall,verbose, \
+    default,example,output,printall,verbose, \
     saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
-    base,user_supplied_ais,user_supplied_doid,Int_type,pickled_list, \
-    var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW,data_base,\
-    crack_front,exodus_in,exodus_out = TakeArgv()
+    base,user_supplied_ais,user_supplied_doid,Int_type, \
+    var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW,\
+    crack_front,exodus_in,exodus_out,num_workers = TakeArgv()
 
     if verbose:
         print('            ---------------------------------------------------')
@@ -1447,8 +1225,7 @@ def main():
     num_bcs = 1 # hard code number of boundary condition sets to 1
 
     # get the filename/location if not supplied as command line arguments
-    filename,conpath,parpath = GetFileName(example,local_node,default,\
-                                           parallel,base,sys.argv,data_base)
+    filename,conpath,parpath = GetFileName(example,default,base,sys.argv)
 
     # do some processing input arguments and prompt for more information as
     # necessary
@@ -1456,7 +1233,7 @@ def main():
         print('******************* surf_only = 1  *******************')
 
     doid_range = None
-    if limit == 1 and parallel == 0 and local_node == 0:
+    if limit == 1:
         print('******************* limit_doid = 1 *******************')
         if default == 1:
             doid_range=((6.0,0.37,-0.05),(6.1,0.46,5.0))
@@ -1473,34 +1250,14 @@ def main():
         model = MeshTools.MeshTools(conpath+filename,'RDB')
     model.SetPointInsideTolerance(1.0e-7)
 
-    # make file extension  
-    extension = '0'; errfile_extension='0'; 
-    if local_node or data_base:
-        extension=os.environ['MSTI_RANK']
-        errfile_extension='.err.'+extension
-    else:
-        errfile_extension='.err'
+    extension = '0'
+    errfile_extension = '.err'
 
-    # prepare the lists and initial a's...
-    # in parallel, run on host node before actual crack growth simulations
-    # begin.  
-    if parallel: 
-        ParallelInitializeStuff(model,doid_range,surface,seed,parameters)
-        sys.exit()
-    # if doid lists and initial crack sizes come from COMPASS... 
-    elif data_base:
-        doid_list,node_list,ais,ncr,ais_map = DataBaseInitializeStuff(model,\
-                                                          extension,parameters)
-    # local_node - run this for a local node in a parallel job... 
-    elif local_node:
-        doid_list,node_list,ais,ncr,ais_map = LocalNodeInitializeStuff(\
-                                              model,extension,parameters)
-    else: 
-        doid_list,node_list,ais,ncr,ais_map = \
-            InitializingStuff(model,user_supplied_doid,pickled_list, \
-                              doid_range,surface,parameters, \
-                              user_supplied_ais,parpath,filename,seed, \
-                              savepickleall,default,example,base)
+    doid_list,node_list,ais,ncr,ais_map = \
+        InitializingStuff(model,user_supplied_doid, \
+                          doid_range,surface,parameters, \
+                          user_supplied_ais,parpath,filename,seed, \
+                          savepickleall,default,example,base)
 
     if verbose:
         print(' arguments:', sys.argv)
@@ -1534,9 +1291,18 @@ def main():
             print(' ')
         Var_Amplitude(ais,model,cracks,parameters,verbose,\
                       saveintermediate,parpath,conpath,filename,extension, \
-                      doid_list,errfile_extension,ncr,scale,nore,data_base, \
-                      local_node,ais_map)
-    else: 
+                      doid_list,errfile_extension,ncr,scale,nore,verify, \
+                      ais_map)
+    elif num_workers > 1:
+        from . import parallel
+        print(" Using an Adaptive RK-5 Forward integration scheme...")
+        print(" (%d worker processes)" % num_workers)
+        print(' ')
+        parallel.run_parallel(cracks,ais,ais_map,ncr,doid_list,num_workers,\
+                              conpath,filename,parpath,exodus_in,\
+                              errfile_extension,scale,Int_type,verify,\
+                              verbose,parameters,cracks.saveall,seed)
+    else:
         print(" Using an Adaptive RK-5 Forward integration scheme...")
         print(' ')
         Fwd_Integration(ais,model,cracks,num_bcs,parameters,verbose,\
@@ -1558,8 +1324,7 @@ def main():
         cracks.PrintDamInfo('all','none',parameters.monte,'all')
 
     if savepickleall: # -sp, binary pickled files. pass file object
-        if data_base or local_node: pass
-        elif parameters.monte:
+        if parameters.monte:
             cracks.NToPickle(parpath+filename+'.stN.'+extension,'all')
 
             OrientFile = open(parpath+filename+'.ori.'+extension,'a')
@@ -1606,15 +1371,9 @@ def main():
         frontfile.close()
 
     # store the total processing time
-    if local_node or data_base:
-        #variable extension named on line 545 above... msti_rank
-        Timefile=open(parpath+filename+'.time.'+extension,'w')
-        Timefile.write(str(time.process_time())+"\n")
-        Timefile.close()
-    else:
-        Timefile=open(parpath+filename+'.time','w')
-        Timefile.write(str(time.process_time())+"\n")
-        Timefile.close()
+    Timefile=open(parpath+filename+'.time','w')
+    Timefile.write(str(time.process_time())+"\n")
+    Timefile.close()
 
     if verbose: 
         print('')
