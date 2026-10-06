@@ -21,7 +21,7 @@ behavioral difference.
 
 ## Status
 
-**Level I is ported, numba-accelerated, and tested** (215 tests: unit tests
+**Level I is ported, numba-accelerated, and tested** (224 tests: unit tests
 for every module, golden-output regression against the *actual captured
 stdout of the original 2006 program*, and a validation suite against the
 published dissertation's real 140k-element coupon model). Levels II and III
@@ -86,6 +86,17 @@ ddsim -base example1 -conpath examples/example1/ -parpath examples/example1/ \
 Carlo vs. deterministic, constant vs. variable amplitude, output options,
 `-j <N>` for multiprocessing).
 
+## Documentation
+
+```bash
+make docs    # needs the `docs` extra: pip install -e ".[docs]" (included in `make env`)
+```
+
+builds a Sphinx site to `docs/build/html/index.html`: a theory page
+summarizing the fatigue-life method and citing the papers in `docs/papers/`,
+a usage guide, and an API reference auto-generated from the package's
+docstrings.
+
 ## Repository layout
 
 | Path | Contents |
@@ -94,7 +105,7 @@ Carlo vs. deterministic, constant vs. variable amplitude, output options,
 | `src/ddsim/tools/` | Ported, working utilities outside the main pipeline (Weibull/reliability plotting, ANSYS output conversion). |
 | `tests/` | The pytest suite, incl. `tests/fixtures/sif_verification/` (small non-proprietary verification cubes with captured original-program output). |
 | `examples/` | A small runnable example case. |
-| `docs/` | `architecture.md` (module map), `PORTING_NOTES.md` (the full porting history), `papers/` (reference PDFs). |
+| `docs/` | `architecture.md` (module map), `PORTING_NOTES.md` (the full porting history), `papers/` (reference PDFs), `source/` (the Sphinx site -- `make docs` to build it). |
 | `legacy/` | Historical, unmaintained material kept for reference: the original compiled Windows/Python-2.4 binaries (`win32-py24/`), the Windows/MPI cluster scripts replaced by `-j` multiprocessing (`windows_cluster_scripts/`), the incomplete Level II/III prototypes (`level2_level3_prototype/`), pre-pytest ad hoc test scripts (`adhoc_test_scripts/`), and ported-but-unused modules (`unused_modules/`). |
 | `reference/cpp/` | **Not tracked by git.** The original C++ Python-extension sources and their Cornell "FTools" support library, kept locally for cross-referencing while porting (see `docs/architecture.md`); they were never independently buildable (missing headers, Python 2 C-API) and have all been reimplemented in `src/ddsim`. |
 

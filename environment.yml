@@ -11,4 +11,4 @@ dependencies:
   - matplotlib
   - pip
   - pip:
-      - -e .  # editable install of the ddsim package itself (see pyproject.toml)
+      - -e .[docs]  # editable install of ddsim + Sphinx/furo for `make docs` (see pyproject.toml)

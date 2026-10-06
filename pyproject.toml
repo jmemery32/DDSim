@@ -20,6 +20,7 @@ dependencies = [
 exodus = ["netCDF4"]
 plotting = ["matplotlib"]
 dev = ["pytest"]
+docs = ["sphinx", "furo"]
 
 [project.scripts]
 ddsim = "ddsim.DDSim:main"

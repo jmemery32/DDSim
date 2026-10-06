@@ -1,4 +1,4 @@
-.PHONY: env install test example clean
+.PHONY: env install test example docs clean
 
 # Create (or update) the conda environment and install ddsim into it, editable.
 # Requires conda/miniconda/mamba on PATH.
@@ -20,6 +20,10 @@ example:
 	ddsim -base example1 -conpath examples/example1/ -parpath examples/example1/ \
 		-v -doid_list 10,0 -scale 100
 
+docs:
+	sphinx-build -b html docs/source docs/build/html
+	@echo "Open docs/build/html/index.html"
+
 clean:
 	find . -name '__pycache__' -not -path './reference/*' -exec rm -rf {} +
-	rm -rf .pytest_cache build dist src/*.egg-info
+	rm -rf .pytest_cache build dist src/*.egg-info docs/build docs/source/api/generated
