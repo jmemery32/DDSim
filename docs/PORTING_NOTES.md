@@ -738,3 +738,32 @@ parameter, both `18900` and `-nore`/no-retardation made agreement *worse*)
 but not root-caused, and is independent of every fix in this section (VA
 never touches `GrowDam`/RK5). Revisit if/when it matters for VA-based
 results specifically.
+
+## `-ai`/`-bi`: command-line override of the deterministic initial flaw size (2026)
+
+Previously the only way to change a deterministic (`monte=0`) run's initial
+flaw size was to hand-edit the `.par` file's `a_b` entry. `-ai <a> [-bi <b>]`
+overrides it from the command line instead (`-bi` defaults to `-ai`'s value
+when omitted -- the common case of an initially circular/equal-dimension
+flaw), so a single geometry/`.par` pair can be swept over initial flaw size
+without editing or duplicating the `.par` file. Ignored, with a printed
+warning, for `monte=1`/`2` runs, where `a_b` means something different (the
+sampling distribution's shape, not a single literal flaw size).
+
+Applied once in `DDSim.main()` by overwriting `parameters.a_b` right after
+the `.par` file is read -- `FwdDeterministic` (and `Var_Amplitude`'s
+deterministic branch) already read the initial flaw size from
+`parameters.a_b[0]`, so every call site downstream picks it up for free.
+The one wrinkle: under `-j`, each worker process re-reads its own
+`Parameters` from disk independently (see the Multiprocessing section
+above) and would silently miss the override, re-reading the unmodified
+`.par` file's own `a_b` instead -- so the override is also threaded through
+as an explicit `a_b_override` argument on `parallel.run_parallel`/
+`_worker_init`, applied to each worker's freshly-constructed `Parameters`
+the same way the parent applies it to its own.
+
+Verified in `tests/test_end_to_end.py`: the override actually changes the
+result relative to the unmodified `.par` file; `-bi` sets the second
+dimension independently; a serial run and a `-j 2` run with the same
+override produce identical results; a `monte=1` run prints the warning and
+otherwise runs unaffected.

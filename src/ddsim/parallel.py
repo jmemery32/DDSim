@@ -47,7 +47,8 @@ def partition_doids(doid_list, num_workers, seed=None):
 
 
 def _worker_init(conpath, filename, parpath, exodus_in, verbose, verify,
-                  int_type, ais, ais_map, ncr, scale, errfile_extension):
+                  int_type, ais, ais_map, ncr, scale, errfile_extension,
+                  a_b_override=None):
     """ProcessPoolExecutor initializer: runs once per worker process (not
     once per task), so the ~11s real-mesh-load cost is paid once per worker
     and amortized across every doid that worker processes."""
@@ -58,6 +59,11 @@ def _worker_init(conpath, filename, parpath, exodus_in, verbose, verify,
         model = MeshTools.MeshTools(conpath + filename, 'RDB')
     model.SetPointInsideTolerance(1.0e-7)
     parameters = Parameters.Parameters(filename, parpath)
+    if a_b_override is not None:
+        # Each worker re-reads the .par file independently (see module
+        # docstring), so DDSim.main()'s own -ai/-bi override of the parent's
+        # Parameters.a_b never reaches here on its own -- re-apply it.
+        parameters.a_b = a_b_override
     # DebugGeomUtils/SVIEW always off in workers: those diagnostic dumps
     # fire once at DamModel construction, off the mesh itself, not per doid
     # -- the parent's own unconditionally-built DamModel already handles
@@ -102,7 +108,8 @@ def _process_chunk(doid_chunk):
 
 def run_parallel(cracks, ais, ais_map, ncr, doid_list, num_workers, conpath,
                  filename, parpath, exodus_in, errfile_extension, scale,
-                 int_type, verify, verbose, parameters, saveall, seed=None):
+                 int_type, verify, verbose, parameters, saveall, seed=None,
+                 a_b_override=None):
     """Parent-side orchestration, called from DDSim.main() in place of
     Fwd_Integration when -j N (N>=2) is given. Mutates cracks.DamOro in
     place with every worker's merged results, then -- if saveall -- writes
@@ -116,7 +123,8 @@ def run_parallel(cracks, ais, ais_map, ncr, doid_list, num_workers, conpath,
 
     with ProcessPoolExecutor(max_workers=num_workers, initializer=_worker_init,
             initargs=(conpath, filename, parpath, exodus_in, verbose, verify,
-                      int_type, ais, ais_map, ncr, scale, errfile_extension)) as ex:
+                      int_type, ais, ais_map, ncr, scale, errfile_extension,
+                      a_b_override)) as ex:
         futures = [ex.submit(_process_chunk, chunk) for chunk in chunks]
         for fut in as_completed(futures):
             cracks.DamOro.update(fut.result())

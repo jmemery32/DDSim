@@ -91,3 +91,51 @@ def test_interior_node_with_uniaxial_stress_does_not_recurse_forever(tmp_path):
     got = run_driver(tmp_path, "8", "100")
     assert got[8][1] == 2
     assert got[8][0] == pytest.approx(33.42699710068892, rel=1e-8)
+
+
+# ---------------------------------------------------------------------------
+# -ai/-bi: command-line override of the deterministic initial flaw size
+# ---------------------------------------------------------------------------
+def test_ai_override_changes_initial_crack_size(tmp_path):
+    """-ai overrides the .par file's a_b (example1.par's default is 0.01)."""
+    default = run_driver(tmp_path / "default", "10", "100")
+    overridden = run_driver(tmp_path / "overridden", "10", "100", extra_args=["-ai", "0.05"])
+    assert default[10] != overridden[10]
+    assert overridden[10] == (13.0, 4)
+
+
+def test_bi_overrides_second_dimension_independently(tmp_path):
+    """-bi sets the second crack dimension separately from -ai (an
+    asymmetric initial flaw); omitting it (previous test) uses -ai for both."""
+    got = run_driver(tmp_path, "10", "100", extra_args=["-ai", "0.05", "-bi", "0.08"])
+    assert got[10] == (11.0, 2)
+
+
+def test_ai_override_matches_across_j(tmp_path):
+    """The -ai override must reach -j workers too -- they re-read the .par
+    file independently (see ddsim.parallel), so the parent's own override of
+    its in-memory Parameters.a_b doesn't reach them for free."""
+    serial = run_driver(tmp_path / "serial", "10,9", "100", extra_args=["-ai", "0.05"])
+    parallel = run_driver(tmp_path / "parallel", "10,9", "100", extra_args=["-ai", "0.05", "-j", "2"])
+    assert serial == parallel == {10: (13.0, 4), 9: (12.0, 2)}
+
+
+def test_ai_ignored_with_warning_for_monte_runs(tmp_path):
+    """-ai only means something for monte=0 (a single literal flaw size);
+    for monte=1/2, a_b sets the sampling distribution's shape instead, so the
+    override is ignored with a printed warning rather than silently changing
+    the distribution."""
+    work = tmp_path / "example1"
+    shutil.copytree(EXAMPLE, work)
+    par = work / "example1.par"
+    par.write_text(par.read_text().replace("monte\n0\n", "monte\n1\n"))
+    # same doid set/scale/seed test_parallel.py's monte-carlo test already
+    # confirms works for monte=1 -- a_b itself isn't exercised by this test,
+    # just that -ai is ignored (with a warning) rather than changing anything.
+    proc = subprocess.run(
+        [sys.executable, "-m", "ddsim.DDSim", "-base", "example1",
+         "-conpath", "./", "-parpath", "./", "-doid_list", "0,1,2,3,4,5,6,7",
+         "-scale", "60", "-ai", "0.05", "-seed", "42"],
+        cwd=work, capture_output=True, text=True, timeout=600)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    assert "WARNING" in proc.stdout and "-ai/-bi" in proc.stdout

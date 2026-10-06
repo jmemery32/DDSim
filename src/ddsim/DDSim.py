@@ -49,6 +49,12 @@ def HelpPrints():
     print('          longer supported!)')
     print(' -doid_list -> to specify node ids to run ddsim for.  Use #,# ')
     print('               i.e. comma, no spaces! ')
+    print(' -ai   -> override the deterministic (monte=0) initial flaw size')
+    print('          from the .par file.  Follow with a number.  -bi (also')
+    print('          followed by a number) sets the second crack dimension')
+    print('          separately; omit it to use -ai for both (an initially')
+    print('          circular/equal-dimension flaw).  Ignored for monte=1/2')
+    print('          runs.  eg.  ...>DDSim.py -base example1 -ai 0.02')
     print(' -j    -> number of worker processes for a local multiprocessing')
     print('          run (default 1, serial -- unchanged from previous')
     print('          versions). Each worker builds its own copy of the mesh,')
@@ -523,11 +529,27 @@ def TakeArgv():
         index=sys.argv.index('-exodus_out')+1
         exodus_out=sys.argv[index]
 
+    # -ai <a> [-bi <b>] overrides the deterministic (monte=0) initial flaw
+    # size normally read from the .par file's a_b, so a single geometry/.par
+    # pair can be swept over initial flaw size from the command line without
+    # editing or duplicating the .par file. -bi defaults to -ai's value when
+    # omitted (the common case: an initially circular/equal-dimension flaw).
+    # Ignored (with a warning) for monte=1/2 runs -- there a_b sets the
+    # sampling distribution's shape, not a single literal flaw size.
+    ai = None
+    if "-ai" in sys.argv:
+        index = sys.argv.index('-ai')+1
+        ai = float(sys.argv[index])
+    bi = None
+    if "-bi" in sys.argv:
+        index = sys.argv.index('-bi')+1
+        bi = float(sys.argv[index])
+
     return default,example,output,printall,verbose, \
            saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
            base,user_supplied_ais,user_supplied_doid,Int_type,\
            var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW, \
-           crack_front,exodus_in,exodus_out,num_workers
+           crack_front,exodus_in,exodus_out,num_workers,ai,bi
 
 #############
 
@@ -1213,7 +1235,7 @@ def main():
     saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
     base,user_supplied_ais,user_supplied_doid,Int_type, \
     var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW,\
-    crack_front,exodus_in,exodus_out,num_workers = TakeArgv()
+    crack_front,exodus_in,exodus_out,num_workers,ai,bi = TakeArgv()
 
     if verbose:
         print('            ---------------------------------------------------')
@@ -1241,6 +1263,19 @@ def main():
 
     # read the path+filename.par file to add the parameters
     parameters = Parameters.Parameters(filename,parpath)
+
+    # -ai [-bi] command-line override of the deterministic initial flaw size
+    # (see TakeArgv) -- only meaningful for monte=0, since a_b means
+    # something different (a sampling distribution's shape) for monte=1/2.
+    a_b_override = None
+    if ai is not None:
+        if parameters.monte != 0:
+            print(' ')
+            print(' WARNING: -ai/-bi only apply to deterministic (monte=0)',\
+                  'runs; ignoring for this monte=%d run.' % parameters.monte)
+        else:
+            parameters.a_b = [[ai, bi if bi is not None else ai]]
+            a_b_override = parameters.a_b
 
     # read and store the finite element model.  -exodus overrides the default
     # RDB (.con/.nod/.sig/.smp) ASCII format with a single Exodus II file.
@@ -1301,7 +1336,8 @@ def main():
         parallel.run_parallel(cracks,ais,ais_map,ncr,doid_list,num_workers,\
                               conpath,filename,parpath,exodus_in,\
                               errfile_extension,scale,Int_type,verify,\
-                              verbose,parameters,cracks.saveall,seed)
+                              verbose,parameters,cracks.saveall,seed,\
+                              a_b_override)
     else:
         print(" Using an Adaptive RK-5 Forward integration scheme...")
         print(' ')
