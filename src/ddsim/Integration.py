@@ -261,9 +261,21 @@ def RK5_CK(step,current_independant,current_dependant,function,args, \
                        current_dependant+summ,args)
     jump = 37*k1/378 + 250*k3/621 + 125*k4/594 + 512*k6/1771
     dep = current_dependant + jump
+    # Cash-Karp embedded error = sum((b_i - b_i*) * k_i); b2=b2*=0, b5=0 (b5*
+    # = 277/14336, hence the k5 term is subtracted, not added). Bug fix,
+    # 2026: 125.0/584 was a typo for 125.0/594 (see docs/PORTING_NOTES.md --
+    # this and the two fixes below were documented, deliberately deferred
+    # anomalies until cross-checking RK5 against an independent integrator
+    # -- VarAmp's cycle-by-cycle stepping, and plain forward Euler -- showed
+    # RK5 taking drastically too-large adaptive steps for a fast-failing
+    # crack, which these fixes resolve).
     error = (37.0/378-2825.0/27648)*k1 + (250.0/621-18575.0/48384)*k3 + \
-            (125.0/584-13525.0/55296)*k4 - 277.0/14336*k5 + (512.0/1771-.25)*k6
-    error = max((max_error*target_error/100.0),error)
+            (125.0/594-13525.0/55296)*k4 - 277.0/14336*k5 + (512.0/1771-.25)*k6
+    # Bug fix, 2026: error is a signed sum (cancellation across k1..k6 can
+    # make it negative) -- must be abs()'d before the max() floor below, or
+    # a negative error is mistaken for a tiny one, causing err_ratio to be
+    # huge and the next step to grow far too aggressively.
+    error = max((max_error*target_error/100.0),abs(error))
     err_ratio = math.fabs(max_error*target_error/error)
     if (recurse and (err_ratio/target_error < 1.0)):
         return RK5_CK(step*err_ratio**.25,current_independant, \
@@ -338,10 +350,13 @@ def RK5_CKslope_vector(step,current_independant,current_dependant,function, \
                        args),step)
     jump = plus(star(k1,37.0/378),plus(star(k3,250.0/621), \
                                 plus(star(k4,125.0/594),star(k6,512.0/1771))))
+    # Bug fixes, 2026 (see RK5_CK and docs/PORTING_NOTES.md): 125.0/584 was a
+    # typo for 125.0/594, and the k5 term (b5=0, b5*=277/14336) must be
+    # *subtracted* like RK5_CK does, not added.
     err = plus(star(k1,(37.0/378-2825.0/27648)), \
                plus(star(k3,(250.0/621-18575.0/48384)), \
-                    plus(star(k4,(125.0/584-13525.0/55296)),\
-            plus(star(k5,277.0/14336),star(k6,(512.0/1771-.25))))))
+                    plus(star(k4,(125.0/594-13525.0/55296)),\
+            plus(star(k5,-277.0/14336),star(k6,(512.0/1771-.25))))))
     error = errnorm(err)
     error = max((max_error*target_error/100.0),error)
     err_ratio = math.fabs(max_error*target_error/error)

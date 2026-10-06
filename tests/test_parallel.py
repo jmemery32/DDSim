@@ -160,9 +160,9 @@ def test_j_matches_serial_golden_values(tmp_path):
     but with -j 3 (3 doids, 3 workers -- one doid per worker)."""
     got = run_driver(tmp_path, "0,12,9", "60", extra_args=["-j", "3"])
     expected = {
-        0: (2216.427697098895, 4),
-        12: (1031.2321596685442, 2),
-        9: (1028.138894903507, 2),
+        0: (406.6135133294466, 4),
+        12: (117.7760415435534, 4),
+        9: (107.23339738673845, 2),
     }
     assert set(got) == set(expected)
     for doid, (life, will_grow) in expected.items():
@@ -175,9 +175,9 @@ def test_j_matches_serial_with_more_doids_than_workers(tmp_path):
     handle multiple doids, exercising the chunking (not just 1 doid/worker)."""
     got = run_driver(tmp_path, "0,1,2,3,4,5,6,7", "100", extra_args=["-j", "3"])
     assert sorted(got) == list(range(8))
-    assert all(got[d][1] == 2 for d in range(8))
+    assert all(got[d][1] == 4 for d in range(8))
     lives = [got[d][0] for d in range(8)]
-    assert lives == pytest.approx([1016.3402594280] * 8, rel=1e-8)
+    assert lives == pytest.approx([79.14869788864108] * 8, rel=1e-8)
 
 
 def _run_saveall(tmp_path, name, nodes, scale, extra_args, patch_monte=False):

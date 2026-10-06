@@ -21,6 +21,12 @@ class Parameters:
         self.r = 1.1 # default fraction to increase a for building K vs. a
                      # also used in VarAmp as monitor to recompute K
         self.Max_crack_size = 10.0 # default max crack size
+        # Added 2026 (see docs/PORTING_NOTES.md): bounds how much a single
+        # RK5 step in GrowDam is allowed to grow the crack, as a fraction
+        # of its current size (da/dN <= max_growth_fraction * a / dN).
+        # Named to avoid colliding with the existing material "alpha"
+        # (Willenborg retardation shut-off exponent, material[14]).
+        self.max_growth_fraction = 0.1
         self.__GetParameters()
 
     def __repr__(self):
@@ -34,6 +40,7 @@ class Parameters:
         s+=", min_inc = %3.6e \n" % (self.min_inc)
         s+=" Sets = %i, Samples = %i, r = %3.3e, Max_crack_size = %8.6e" % \
             (self.sets,self.samples,self.r,self.Max_crack_size)
+        s+=", max_growth_fraction = %4.3e" % (self.max_growth_fraction)
         s+="\n"
         s+=' NASGRO material properties are: \n'
         p=self.__MaterialsRepr()
@@ -107,6 +114,9 @@ class Parameters:
             elif vals[0] == 'MaxCrack':
                 vals = str.split(self.__GetLine(file))
                 self.Max_crack_size = float(vals[0])
+            elif vals[0] == 'max_growth_fraction':
+                vals = str.split(self.__GetLine(file))
+                self.max_growth_fraction = float(vals[0])
 
             buff = self.__GetLine(file)
 

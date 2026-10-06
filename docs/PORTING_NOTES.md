@@ -584,3 +584,157 @@ compares against the historical result, plus a determinism check (serial vs
 separately-gated test (`DDSIM_SIPS3002_FULL_N`, pointing at a *precomputed*
 full-model `.N` file -- it never runs the ~1hr simulation itself) checks the
 whole-model statistics above against the thresholds established here.
+
+## RK5 near-instability overshoot (2026)
+
+Three separate, real bugs in the RK5 constant-amplitude integration path,
+found while cross-checking `SimDamGrowth` (continuous RK5/Euler) against an
+independent cycle-by-cycle integrator (`Var_Amplitude`) on a synthetic
+near-constant-amplitude spectrum (small Gaussian noise around a fixed
+amplitude, same R-ratio, on `example1`). All three are confirmed present
+byte-for-byte in the original 2007 source (`bd2d7d0`), not port-introduced.
+
+### Bug 1: Cash-Karp embedded-error coefficients (`Integration.py`)
+
+`RK5_CK` (scalar) and `RK5_CKslope_vector` (vector) both had:
+
+* a coefficient typo in the embedded-error combination: `125.0/584` where
+  the standard Cash-Karp tableau has `125.0/594`;
+* a sign error: the `k5` term in the error estimate should be *subtracted*,
+  not added (`RK5_CKslope_vector` had `star(k5, 277.0/14336)`; fixed to
+  `star(k5, -277.0/14336)`, matching `RK5_CK`'s own convention right next to
+  it in the same file);
+* a missing `abs()` before the `max()` floor check on the (signed) error
+  value in `RK5_CK` -- `max(floor, error)` with a negative `error` always
+  returns the floor, silently hiding real error growth.
+
+These are real math bugs, independent of everything below, but turned out
+not to be the dominant cause of the overshoot this section is mostly about
+(see Bug 2) -- they're still worth having fixed regardless.
+
+### Bug 2: the exception fallback never actually took a small step (`DamMo.GrowDam`)
+
+`GrowDam`'s RK5 branch wraps `Integration.RK5_CKslope_vector` in a
+`try/except`; on `FitPolyError`/`dAdNError`/`ValueError` it used to fall back
+to `Integration.Eulerslope_vector(self.DamOro[doid].nextdN/1000.0, ...)` --
+intended as "take one small step and try again next call." Two compounding
+problems:
+
+* `Eulerslope_vector`'s own `step` parameter is **completely unused in its
+  body** (`return function(current_independant, current_dependant, args)`)
+  -- it only evaluates the derivative at the current point, never advances
+  by the given step.
+* The except block only ever reassigned `self.DamOro[doid].nextdN` (pure
+  bookkeeping for *next* call), never the *outer* `dN` variable that
+  `SimDamGrowth` actually uses to scale the increment
+  (`inc=[abs(rate[i])*dN...]`). So the "one small step" fallback silently
+  used the full, unrefined `parameters.dN` as the real increment multiplier
+  every time -- invisible on `example1` only because its own `dN` happens to
+  equal the hardcoded `1000.0`.
+
+Traced concretely on `example1` doid 10, scale 100: `dN` history
+`[1000.0, 1.0, 1000.0, 0.0]`, crack-size history `a: 0.01 -> 0.99 -> 2.09 ->
+2555.0` -- the catastrophic jump was one 1000-cycle step taken immediately
+after a 1-cycle step had just shown the crack growing extremely fast. Fixed
+by reassigning the outer `dN` (not just `nextdN`) to the shrunk step, and
+using `parameters.dN` as the divisor instead of a hardcoded `1000.0`.
+
+This fix alone introduced a new problem: dividing `nextdN` by
+`parameters.dN` *every time* an exception recurs compounds geometrically and
+can underflow to exactly `0.0`, crashing `RK5_CKslope_vector`'s `1.0/step`
+with `ZeroDivisionError` (reproduced concretely on doid 8). Fixed with a
+gentler, fixed divisor (`/10.0`) and a hard floor
+(`parameters.dN * _MIN_STEP_FRACTION`, `_MIN_STEP_FRACTION = 0.001`).
+
+### Bug 3 (the main fix): RK5 could take one step that overshoots the entire stable-growth region
+
+Even with Bugs 1-2 fixed, RK5's own *successful* adaptive step-size control
+could still pick a single step, near the stiff/singular region as
+`Ki -> Kic`, large enough to jump the crack from "stable" to "fully
+unstable, past the mesh" in one call -- not an exception path at all, just
+RK5 legitimately proposing (and succeeding at) too large a step for how fast
+`da/dN` is actually changing there. This is expected, textbook behavior for
+explicit, fixed-order adaptive RK methods near a vertical asymptote: a local
+error estimate computed for smooth local behavior doesn't anticipate
+extremely fast-changing behavior just ahead of the evaluated point.
+
+A first fix attempt capped the *starting* step proactively based on `Kmax`'s
+proximity to `Kic` (a linear fraction from full step at margin >= 0.3 down to
+a floor at margin -> 0). **This failed**: live-tracing doid 10 showed the
+crack doubling in size in a single cycle (`a: 1.035 -> 2.013`) while this
+metric still classified it "far from instability," and right at the
+threshold the computed fraction was `~0.9999` -- essentially no cap exactly
+where one was needed.
+
+The working fix bounds relative crack growth *directly*, with no Ki/Kic
+proxy: before each RK5 attempt, evaluate the current rate
+(`DamEl.dAdN(N, abab, [scale])`) and cap the step so that
+
+```
+da/dN <= max_growth_fraction * a / dN
+```
+
+for every crack-front point with a positive rate (`parameters.max_growth_fraction`,
+new `.par` keyword, default `0.1` i.e. 10% -- not named `alpha` to avoid
+colliding with the existing material property `alpha`, the Willenborg
+retardation shut-off exponent, `material[14]`). When this computed `safe_dN`
+is smaller than the adaptive controller's current starting guess
+(`self.DamOro[doid].nextdN`), RK5 is bypassed entirely in favor of a direct
+Euler step at `safe_dN`. Key insight (re-confirmed by reading
+`RK5_CKslope_vector`): RK5 only ever *shrinks* a step within a single call
+via its own internal recursion, never grows it beyond what it was handed to
+attempt -- growth only ever affects the *suggested next* call's starting
+guess -- so capping the starting guess before each call is sufficient to
+bound the actual step taken.
+
+### Validation
+
+* Independent cross-check: a synthetic near-constant-amplitude spectrum (low
+  Gaussian noise around a fixed R=0 amplitude) run through both `SimDamGrowth`
+  (RK5/Euler) and `Var_Amplitude` (plain cycle counting) on the same
+  geometry. Pre-fix, RK5 gave life 1001.72 vs. VarAmp's 27 and plain forward
+  Euler's 37.2 -- RK5 was the ~27-37x outlier. Post-fix: doid 10 -> 27.0,
+  doid 8 -> 33.4, both now consistent with VarAmp/forward-Euler order of
+  magnitude.
+* Full real-data comparison against the historical SIPS3002 `070530.N`
+  result (all 4,781 doids with real particles mapped, constant-amplitude):
+  median relative difference 3.3%, p90 14.2%, max 34.4%. Variable-amplitude
+  loading (403-doid representative sample) is essentially unchanged (median
+  0.0%, p90 2.2%) -- expected, since `Var_Amplitude` never calls `GrowDam`
+  or touches `Integration.py` at all.
+* Spatial-smoothness check: the first working fix (gentle backoff divisor
+  only, no growth cap) introduced visible, non-physical "splotchiness" in
+  contour plots over the real SIPS3002 mesh -- confirmed quantitatively via
+  a nearest-spatial-neighbor life-difference comparison on the hot-spot
+  cluster (old historical result: mean local diff 764.7; that first fix:
+  2854.1, ~4x worse -- genuine noise, not a visualization artifact). The
+  `max_growth_fraction` cap above brings this down to 926.5 (~21% worse than
+  the historical result), and the cube-symmetry test's 8 corners now agree
+  to 13+ significant figures.
+* `GOLDEN`/hardcoded-life values in `tests/test_end_to_end.py`,
+  `tests/test_parallel.py`, and 7 of the 10 cases in
+  `tests/test_sif_verification_golden.py` (moved into
+  `RK5_FIX_DIVERGENCE_CASES`, same treatment as the pre-existing
+  `test_ab3333_known_divergence`) were re-recorded against this fixed
+  behavior -- see those files' own docstrings/comments for the reasoning per
+  case. `test_cube_symmetry_...`'s 8 corners now report `WillGrow=4`, not
+  the old hardcoded `2`; `test_interior_node_with_uniaxial_stress_...`
+  (doid 8) now reports `WillGrow=2` instead of `4` -- the fix catches the
+  same crack as genuinely unstable while it's still inside the cube, instead
+  of letting it overshoot past the mesh boundary first.
+* A full before/after comparison Exodus file for the real SIPS3002 model
+  (`ca_life_old/new/diff`, `va_life_old/new/diff` nodal variables) was built
+  and delivered to
+  `SIPS_data/DDSimLI/SIPS3002_open/claude_rk5_fix_comparison/SIPS3002_old_vs_new.exo`
+  for visual confirmation before these golden values were accepted.
+
+### Still open
+
+The ~2-3% systematic, retardation-sensitive offset found earlier in
+`Var_Amplitude` validation against the historical VA result (same direction
+and magnitude across the whole particle population, unlike CA's
+provenance-explained scatter) was investigated (ruled out: `damp` material
+parameter, both `18900` and `-nore`/no-retardation made agreement *worse*)
+but not root-caused, and is independent of every fix in this section (VA
+never touches `GrowDam`/RK5). Revisit if/when it matters for VA-based
+results specifically.

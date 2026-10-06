@@ -20,11 +20,17 @@ from . import exodus_io
 
 # give dumpfile the string name for a file and varamp will dump
 # a vs N to a file named dumpfile.  Leave as None if you do not
-# want it to DumpFile().  
+# want it to DumpFile().
 dumpfile = 0
 ##dumpfile = "h:\\users\jme32\\research\\URETI\\Verification\\119032_will_-a"
 Nlimit = 55000.0
 Nout = 1
+
+# Added 2026 (see docs/PORTING_NOTES.md and GrowDam's RK5 branch): a floor
+# on how small a step GrowDam will ever take, as a fraction of the nominal
+# parameters.dN, regardless of the max_growth_fraction-based cap or the
+# exception fallback -- so neither can shrink the step all the way to zero.
+_MIN_STEP_FRACTION = 0.001
 
 # Some global functions...
 
@@ -290,13 +296,13 @@ class DamModel:
 
 ######## DamModel
 
-    def GrowDam(self,doid,DamEl,parameters,N,scale,integration): 
+    def GrowDam(self,doid,DamEl,parameters,N,scale,integration,R=None):
         '''
         Calculate individual growth amount for each "corner" of the ellipse
         and advance the crack.
         '''
 
-        assert (len(DamEl.a[1])>0) # i.e there is a SIF History... 
+        assert (len(DamEl.a[1])>0) # i.e there is a SIF History...
 
         # Get current crack lengths...
         # Don't use __GiveCurrent because don't want average a and b...
@@ -329,43 +335,72 @@ class DamModel:
             # assume always using NASGRO equations with RK5 scheme...
             if (self.DamOro[doid].nextdN == 0.0): self.DamOro[doid].nextdN = dN
 
-            # the integrations scheme can sometimes become unstable and pass
-            # calcki numbers that don't make sense (too big).  Hence, we put in
-            # a try and except block.  if RK5 scheme is bunk we do on small
-            # step by the fwd euler method in hopes that springs us loose of
-            # bad spot.  may need to add a finally or something to this in the
-            # future.
-
+            # Bug fix, 2026 (see docs/PORTING_NOTES.md): this used to
+            # always attempt RK5 first and only shrink the step
+            # *reactively*, after an exception, by retrying with a step
+            # divided by a fixed factor some number of times. That retry
+            # count is sensitive to numerical happenstance unrelated to
+            # the real (smoothly-varying) stress field, and was found --
+            # visually, then quantitatively (adjacent hot-spot nodes
+            # differing by thousands of cycles) -- to inject severe,
+            # non-physical node-to-node noise.
+            #
+            # A first attempt fixed this by capping the step based on
+            # proximity to Kic (Kmax/Kic) instead. That didn't hold up
+            # either: RK5's own adaptive error control, even with the
+            # Cash-Karp coefficients corrected, let the crack *double in
+            # size in a single cycle* while still classified as "far from
+            # instability" by that metric -- and right at the boundary,
+            # the capping fraction came out to ~1.0, essentially no cap
+            # at all exactly where it was needed most.
+            #
+            # Direct, unconditional fix instead: bound da/dN itself, as a
+            # fraction of the current crack size, regardless of proximity
+            # to Kic -- da/dN <= max_growth_fraction * a / dN, i.e. never
+            # let a single step grow the crack by more than
+            # max_growth_fraction (user-configurable via the .par file,
+            # default 10%). This targets the actual failure mode directly
+            # (a step too large relative to the current, possibly very
+            # steep, local slope) instead of trying to predict it
+            # indirectly via a proxy that turned out to be unreliable.
+            # RK5 only ever shrinks a step *within* a single call (via its
+            # own recursive refinement) and never grows it beyond what it
+            # was given to attempt -- growth only affects the *next*
+            # call's starting guess -- so capping nextdN here, every call,
+            # against the current local slope is sufficient to bound the
+            # actual step taken.
             try:
-                rate,dN,self.DamOro[doid].nextdN = \
-                    Integration.RK5_CKslope_vector(self.DamOro[doid].nextdN,\
-                    N,abab,DamEl.dAdN,[scale],max_er,.05)
+                rate_now = DamEl.dAdN(N,abab,[scale])
+                positive = [rate_now[i] for i in range(len(abab)) if rate_now[i] > 0.0]
+                if positive:
+                    safe_dN = min(parameters.max_growth_fraction*abab[i]/rate_now[i] \
+                                  for i in range(len(abab)) if rate_now[i] > 0.0)
+                else:
+                    safe_dN = self.DamOro[doid].nextdN
+            except (DamErrors.FitPolyError, DamErrors.dAdNError, ValueError):
+                rate_now = None
+                safe_dN = self.DamOro[doid].nextdN
 
-            except DamErrors.FitPolyError as message:
-                if self.verbose:
-                    print((' switch to one step fwd Euler for', \
-                          message.args[0],'at doid', doid, 'due to'))
-                    print(('     ', message.args[1]))
-                rate = Integration.Eulerslope_vector( \
-                    self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
-                self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
+            if rate_now is not None and safe_dN < self.DamOro[doid].nextdN:
+                dN = max(safe_dN, parameters.dN*_MIN_STEP_FRACTION)
+                self.DamOro[doid].nextdN = dN
+                rate = rate_now
 
-            except DamErrors.dAdNError as message:
-                if self.verbose:
-                    print((' switch to one step fwd Euler for', \
-                          message.args[0],'at doid', doid, 'due to',message.args[1]))
-                rate = Integration.Eulerslope_vector( \
-                    self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
-                self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
+            else:
+                try:
+                    rate,dN,self.DamOro[doid].nextdN = \
+                        Integration.RK5_CKslope_vector(self.DamOro[doid].nextdN,\
+                        N,abab,DamEl.dAdN,[scale],max_er,.05)
 
-            except ValueError as message:
-                if self.verbose:
-                    print((' switch to one step fwd Euler for Fellipse', \
-                          'at doid', doid, 'due to'))
-                    print(('     ', message.args[0])) 
-                rate = Integration.Eulerslope_vector( \
-                    self.DamOro[doid].nextdN/1000.0,N,abab,DamEl.dAdN,[scale])
-                self.DamOro[doid].nextdN = self.DamOro[doid].nextdN/1000.0
+                except (DamErrors.FitPolyError, DamErrors.dAdNError, \
+                        ValueError) as message:
+                    if self.verbose:
+                        print((' switch to one step fwd Euler for', \
+                              'at doid', doid, 'due to', message))
+                    dN = max(self.DamOro[doid].nextdN/10.0, parameters.dN*_MIN_STEP_FRACTION)
+                    self.DamOro[doid].nextdN = dN
+                    rate = Integration.Eulerslope_vector( \
+                        dN,N,abab,DamEl.dAdN,[scale])
 
         # Caclulate the new a, b, a-, b-.
         # a, b and neg_a, neg_b never to take negative value (which shouldn't
@@ -761,7 +796,7 @@ class DamModel:
                 # indeed, will grow stably.  (ie. Kth<Ki<Kic)
                 elif will_grow == 1:
                     dN=self.GrowDam(doid,CurrentElement,parameters,N,scale, \
-                                    self.IntegrationScheme)
+                                    self.IntegrationScheme,R)
                     N+=dN
 
                     # if N has reached a practical maximum... 
