@@ -767,3 +767,56 @@ result relative to the unmodified `.par` file; `-bi` sets the second
 dimension independently; a serial run and a `-j 2` run with the same
 override produce identical results; a `monte=1` run prints the warning and
 otherwise runs unaffected.
+
+## `-crack_path`: visualize the predicted crack path in ParaView (2026)
+
+`DamModel.WriteCrackPathVTK` (wired to a new `-crack_path <path>` flag)
+writes one doid's full crack-growth history as a legacy VTK PolyData file
+(plain ASCII, no external dependency to write or read it -- ParaView loads
+it natively) -- one polyline per recorded growth step, tracing the crack
+front's actual shape in global (real, mesh) coordinates at that step, with
+`CELL_DATA` giving each step's cumulative cycle count (`N`) and crack type
+(`0`=Fellipse/embedded, `1`=Hellipse/surface, `2`=Qellipse/corner). Load it
+in ParaView alongside the mesh/stress Exodus file (`-exodus_out`) and color
+by `N` to see the predicted crack grow, step by step, over the node's life.
+
+The per-step history and point geometry already existed (`ComputeFrontPoints`,
+used by the pre-existing `-cf`/`FrontPoints`, which just dumps raw point
+coordinates to a text file with no structure a viewer can use) -- the new
+part is reconstructing each step's cumulative cycle count and writing it as
+a structured, directly-viewable file:
+
+* Each crack-growth regime (`DamOro[doid].DamEl`, a list -- e.g. an
+  embedded Fellipse crack that later breaks the surface and becomes a
+  Hellipse) keeps its own local history: `stage.a[0][0]` (a length-`L` list,
+  one entry per recorded state, starting with the initial size) and
+  `stage.dN` (also length `L`: `dN[i-1]` is the increment from state `i-1`
+  to state `i`, for `i` in `1..L-1`; the *last* entry, `dN[L-1]`, is always
+  a trailing `0.0` written by `SimDamGrowth`'s terminal/transition branches
+  and never corresponds to another state in this stage -- confirmed by
+  reading every code path that appends to `.dN` alongside `UpdateState`).
+  Cumulative `N` is reconstructed by walking every stage in order, carrying
+  the running total across stage boundaries (a transition doesn't advance
+  `N` -- it's the same physical state, just re-expressed in the new
+  ellipse-type's own parameterization).
+* Fellipse's 20 sample points (`phi` in `[-1.0, 0.9]`, not reaching back to
+  `1.0`) don't quite close the loop on their own; since Fellipse is the one
+  crack type that's a fully embedded, genuinely closed ellipse (unlike
+  Hellipse/Qellipse, open arcs that end at the free surface), its polyline
+  repeats the first point index at the end to close it visually.
+
+Only meaningful for one doid at a time (same "pick the first in `DamOro`"
+convention as `-cf`), and only for a serial (no `-j`) run: a `-j` worker's
+returned `DamOro[doid].DamEl` has already been stripped down to just the
+final state (`_StrippedDamEl`/`StripDamElForTransport`, see the
+Multiprocessing section above) by the time it reaches the parent -- the
+full step-by-step history this needs is simply gone by then. Fails loudly
+(`RuntimeError`) rather than silently writing a useless one-step file.
+
+Verified in `tests/test_crack_path.py`: the written file's points/lines are
+well-formed and self-consistent (every line indexes real points, no
+duplicate indices within a line other than the deliberate Fellipse closing
+repeat); the last step's cumulative `N` matches the run's own reported life;
+`N` is monotonically increasing; Fellipse steps close the loop and
+Hellipse/Qellipse steps don't; a `-j` run fails clearly instead of writing
+a broken file.

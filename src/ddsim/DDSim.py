@@ -86,6 +86,11 @@ def HelpPrints():
     print("           string to indicate name and location of sview file. ")
     print(" -cf -> prints crack front points to a file named <filename>.front")
     print("        ONLY use this for single doid runs.")
+    print(" -crack_path <path> -> write the full crack-growth history as a")
+    print("           legacy VTK PolyData file (one polyline per growth")
+    print("           step, colored by cycle count), viewable in ParaView")
+    print("           alongside -exodus_out. ONLY use this for single doid")
+    print("           runs, without -j.")
     print(" -exodus <path> -> read the finite element model from an Exodus II")
     print("           file instead of the default RDB ASCII format. Material")
     print("           parameters still come from the usual .par file.")
@@ -545,11 +550,22 @@ def TakeArgv():
         index = sys.argv.index('-bi')+1
         bi = float(sys.argv[index])
 
+    # -crack_path <path> writes the full crack-growth history (one doid --
+    # the first in doid_list, same "pick the first" convention as -cf) as a
+    # legacy VTK PolyData file, directly loadable in ParaView alongside the
+    # mesh/stress Exodus file (-exodus_out) to visualize the predicted crack
+    # path growing over the node's life. Only meaningful without -j (see
+    # DamModel.WriteCrackPathVTK).
+    crack_path_out = None
+    if "-crack_path" in sys.argv:
+        index = sys.argv.index('-crack_path')+1
+        crack_path_out = sys.argv[index]
+
     return default,example,output,printall,verbose, \
            saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
            base,user_supplied_ais,user_supplied_doid,Int_type,\
            var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW, \
-           crack_front,exodus_in,exodus_out,num_workers,ai,bi
+           crack_front,exodus_in,exodus_out,num_workers,ai,bi,crack_path_out
 
 #############
 
@@ -1235,7 +1251,7 @@ def main():
     saveall,savepickleall,savecontour,limit,surface,saveintermediate,\
     base,user_supplied_ais,user_supplied_doid,Int_type, \
     var_file,seed,scale,nore,verify,DebugGeomUtils,SVIEW,\
-    crack_front,exodus_in,exodus_out,num_workers,ai,bi = TakeArgv()
+    crack_front,exodus_in,exodus_out,num_workers,ai,bi,crack_path_out = TakeArgv()
 
     if verbose:
         print('            ---------------------------------------------------')
@@ -1405,6 +1421,9 @@ def main():
         frontfile=open(parpath+filename+'.front','w')
         cracks.FrontPoints(frontfile)
         frontfile.close()
+
+    if crack_path_out: # -crack_path <path>
+        cracks.WriteCrackPathVTK(crack_path_out)
 
     # store the total processing time
     Timefile=open(parpath+filename+'.time','w')

@@ -1244,6 +1244,98 @@ class DamModel:
                                     str(qpnt.z())+"\n")
                 frontfile.write('################# \n')
 
+######## DamModel
+
+    def WriteCrackPathVTK(self,path,doid=None):
+        '''
+        Write one doid's full crack-growth history as a legacy VTK PolyData
+        file (ASCII) -- one polyline per recorded growth step, tracing the
+        crack front's shape at that step in real (global) coordinates, with
+        CELL_DATA giving each step's cumulative cycle count (N) and crack
+        type (0=Fellipse/embedded, 1=Hellipse/surface, 2=Qellipse/corner).
+        Load directly in ParaView alongside the mesh/stress Exodus file
+        (ToExodusFile) and color by "N" to see the predicted crack path grow
+        over the node's life.
+
+        Added 2026 (see docs/PORTING_NOTES.md). Like FrontPoints, only
+        meaningful for one doid at a time -- if doid isn't given, the first
+        (sorted) key in DamOro is used, same convention as FrontPoints.
+
+        Only works for a doid whose full step-by-step history is still
+        live, i.e. a serial (no -j) run: -j workers return a stripped-down
+        DamEl holding only the final state (see _StrippedDamEl /
+        StripDamElForTransport), by which point the history this needs is
+        already gone.
+        '''
+        if doid is None:
+            doid = sorted(self.DamOro.keys())[0]
+        dam_els = self.DamOro[doid].DamEl
+        if dam_els and isinstance(dam_els[0], _StrippedDamEl):
+            raise RuntimeError(
+                "doid %d's crack-growth history isn't available to plot -- "
+                "it went through a -j worker process, which only keeps the "
+                "final state (see _StrippedDamEl). Re-run this doid without "
+                "-j to get a full crack path." % doid)
+
+        type_index = {'Fellipse': 0, 'Hellipse': 1, 'Qellipse': 2}
+        points = []   # flattened (x,y,z), shared across every step/line
+        lines = []    # one list of point indices per recorded step
+        line_N = []   # cumulative cycle count, one entry per line
+        line_type = []
+        line_step = []
+
+        cum_N = 0.0
+        step = 0
+        for stage in dam_els:
+            n_states = len(stage.a[0][0])
+            for i in range(n_states):
+                if i > 0:
+                    cum_N += stage.dN[i-1]
+                qpnts = stage.ComputeFrontPoints(i)
+                start = len(points)
+                points += [(q.x(), q.y(), q.z()) for q in qpnts]
+                idx = list(range(start, start + len(qpnts)))
+                if stage.names[0] == 'Fellipse':
+                    # Fellipse (fully embedded) is a closed loop; its 20
+                    # sample points don't quite reach back around (phi runs
+                    # [-1.0, 0.9], not [-1.0, 1.0)) -- repeat the first index
+                    # to close it visually. Hellipse/Qellipse are genuinely
+                    # open arcs that terminate at the free surface.
+                    idx.append(start)
+                lines.append(idx)
+                line_N.append(cum_N)
+                line_type.append(type_index.get(stage.names[0], -1))
+                line_step.append(step)
+                step += 1
+
+        with open(path, 'w') as f:
+            f.write("# vtk DataFile Version 3.0\n")
+            f.write("DDSim predicted crack path, doid %d\n" % doid)
+            f.write("ASCII\n")
+            f.write("DATASET POLYDATA\n")
+            f.write("POINTS %d float\n" % len(points))
+            for x,y,z in points:
+                f.write("%.8e %.8e %.8e\n" % (x,y,z))
+
+            total_ints = sum(len(l)+1 for l in lines)
+            f.write("LINES %d %d\n" % (len(lines), total_ints))
+            for l in lines:
+                f.write(str(len(l)) + " " + " ".join(str(i) for i in l) + "\n")
+
+            f.write("CELL_DATA %d\n" % len(lines))
+            f.write("SCALARS N float 1\n")
+            f.write("LOOKUP_TABLE default\n")
+            for n in line_N:
+                f.write("%.8e\n" % n)
+            f.write("SCALARS crack_type int 1\n")
+            f.write("LOOKUP_TABLE default\n")
+            for t in line_type:
+                f.write("%d\n" % t)
+            f.write("SCALARS step int 1\n")
+            f.write("LOOKUP_TABLE default\n")
+            for s in line_step:
+                f.write("%d\n" % s)
+
 
 ######## DamModel
 
