@@ -431,6 +431,7 @@ class DamModel:
 
         # update Damage element
         DamEl.UpdateState(abab_new)
+        DamEl.state_N.append(N+dN)  # see state_N's docstring (DamClass.py)
 
         return dN
 
@@ -828,6 +829,11 @@ class DamModel:
             else:
                 # Update dN
                 CurrentElement.dN+=[0.0]
+                # dam_elem is a brand-new object (its __init__ set
+                # state_N=[0.0]) -- it's the SAME physical state as
+                # CurrentElement's current one, just re-expressed in the new
+                # element's own geometry, so its absolute N is N, not 0.0.
+                dam_elem.state_N = [N]
                 self.DamOro[doid].DamEl+=[dam_elem]
                 CurrentElement=dam_elem
 
@@ -1284,13 +1290,12 @@ class DamModel:
         line_type = []
         line_step = []
 
-        cum_N = 0.0
         step = 0
         for stage in dam_els:
             n_states = len(stage.a[0][0])
             for i in range(n_states):
-                if i > 0:
-                    cum_N += stage.dN[i-1]
+                cum_N = stage.state_N[i]  # already absolute (see
+                                           # state_N's own docstring)
                 qpnts = stage.ComputeFrontPoints(i)
                 start = len(points)
                 points += [(q.x(), q.y(), q.z()) for q in qpnts]
@@ -1606,6 +1611,7 @@ class DamModel:
                     aa = JVT.Plus(aa,inc)
                     # Update the damage element
                     for i in range(lena): DamEl.a[i][0]+=[aa[i]]
+                    DamEl.state_N.append(N)  # see state_N's docstring (DamClass.py)
 
                     # Check if aa exceeds aR
                     if max(aa) > aR:
@@ -1644,6 +1650,11 @@ class DamModel:
 
             # if DK = None, stop growing, aa has exceeded a
             else:
+                # damel is a brand-new object (its __init__ set
+                # state_N=[0.0]) -- it's the SAME physical state as DamEl's
+                # current one, just re-expressed in the new element's own
+                # geometry, so its absolute N is N, not 0.0.
+                damel.state_N = [N]
                 self.DamOro[doid].DamEl+=[damel]
                 DamEl=damel
         # end while

@@ -820,3 +820,100 @@ repeat); the last step's cumulative `N` matches the run's own reported life;
 `N` is monotonically increasing; Fellipse steps close the loop and
 Hellipse/Qellipse steps don't; a `-j` run fails clearly instead of writing
 a broken file.
+
+### Bug found later: `-crack_path`'s cumulative `N` was wrong for VarAmp (2026)
+
+The above was only tested against the constant-amplitude (`GrowDam`/RK5)
+path before being shipped. Using it for real variable-amplitude SIPS3002
+data (see "`ddsim.tools.top_crack_paths`" below) surfaced a real bug: the
+written `N` values were off by 5-6x (e.g. a doid with a true life of 28,452
+cycles showed a max recorded `N` of only 4,782).
+
+Root cause: the original implementation reconstructed cumulative `N` by
+summing `self.dN` (`cum_N += stage.dN[i-1]` for each recorded state `i`).
+That's valid for `GrowDam`'s RK5/Euler path, where every `self.dN` entry but
+one trailing zero lines up 1:1 with a real state -- but `VarAmp` appends to
+`self.dN` on **every spectrum cycle checked**, including compressive and
+near-threshold "stall" cycles that never advance `self.a[i][0]` (a crack can
+stall for up to `spec.length` cycles, anywhere in the middle of a run, before
+resuming growth or giving up) -- so for VarAmp, `self.dN` mixes real-growth
+increments with these "nothing happened" cycles indistinguishably, and
+summing it systematically undercounts.
+
+Fixed with a new, purpose-built field: `state_N`, a list on every
+`Fellipse`/`Hellipse`/`Qellipse` instance, index-aligned 1:1 with
+`self.a[i][0]` (appended only on a *real* new state, in both `GrowDam` and
+`VarAmp`'s growth branches -- never on a stall/skip cycle), storing the
+doid's **absolute** cumulative `N` directly rather than relying on summing
+anything. `WriteCrackPathVTK` now just reads `stage.state_N[i]`.
+
+A second, related bug surfaced while fixing the first: a brand-new crack
+element created at a regime transition (e.g. `Fellipse` -> `Hellipse`, same
+physical state just re-expressed in the new geometry) gets a fresh
+`state_N = [0.0]` from its own `__init__` -- correct for a doid's very first
+element, wrong for every later one, which should inherit the current
+absolute `N` at the moment of transition, not restart at zero. Fixed at both
+call sites that append a new element to `DamOro[doid].DamEl` (in
+`SimDamGrowth` and in `VarAmp`): immediately overwrite the new element's
+`state_N` with `[N]` (the current absolute cycle count) right after
+construction, before it's used.
+
+Verified against real SIPS3002 VA data (doid 119032, see below): after both
+fixes, the crack-path file's max `N` (28,451) matches the rerun's own
+reported life (28,452) to within one cycle -- the one-cycle gap is
+itself correct, not a bug: the final cycle that *detects* instability
+(`WillGrow=2`) ends the run without growing the crack any further, so it
+never gets its own recorded state.
+
+### A real `Var_Amplitude` behavior worth knowing before using `-crack_path` on it
+
+Discovered while building `top_crack_paths` (below): for Monte Carlo
+(`monte=1/2`) variable-amplitude loading, `DDSim.Var_Amplitude` simulates
+the doid's *largest* particle first (this is what sets the doid's own
+reported `Life`), then walks every other particle from largest to smallest,
+calling `cracks.DamOro[doid].Flush()` before each one and re-running
+`VarAmp` for it -- so by the time `Var_Amplitude` returns, whatever's live
+in `DamOro[doid].DamEl` is whichever particle happened to be simulated
+*last* (the smallest one that still grew, right before one failed to), not
+the largest/"worst case" one, and not what `Life` was actually computed
+from. `-crack_path` right after a real `-VarAmp` Monte Carlo run therefore
+shows an arbitrary smaller particle's path, not the doid's own headline
+result -- surprising, but not a bug in `-crack_path` itself (it faithfully
+reports whatever's actually left in `DamOro[doid].DamEl`). `n` other
+particles in the same doid never get their own full growth history at all
+(`DamModel.InterpolateLife` estimates their life from the largest
+particle's curve instead) -- so there's only ever at most one real crack
+path per doid.
+
+`ddsim.tools.top_crack_paths` sidesteps this by simulating just the largest
+particle directly (one `AddFDam`+`VarAmp` call, no `Var_Amplitude`/`Flush`
+loop at all) -- which is also the *right* one for "most critical crack
+path," since it is exactly the simulation that determines the doid's own
+reported life.
+
+## `ddsim.tools.top_crack_paths`: the N most critical crack paths (2026)
+
+Finds the `N` lowest-life doids from an existing (real or rerun) `.N`
+result file and writes each one's own representative crack-growth history
+as a `-crack_path`-style VTK file -- all from a *single* mesh load, rather
+than `N` separate `ddsim` subprocess invocations (each of which would pay
+the real SIPS3002 mesh's own ~11s load cost independently).
+
+For Monte Carlo (`monte=1/2`) inputs, "representative" is the doid's own
+largest-particle initial flaw -- see the `Var_Amplitude`/`Flush()` behavior
+above for why that specifically (not whatever `DDSim.Var_Amplitude` itself
+would leave behind) is the right simulation to reproduce. Re-implements the
+`.rnd`/`.map` particle-filter reading and the largest-ai `AddFDam`+`VarAmp`
+(or, for constant amplitude, `SimDamGrowth`) call directly, rather than
+calling `DDSim.main()`/`Var_Amplitude` -- deliberately not touching that
+driver function's own, already-validated per-particle sweep.
+
+```
+python -m ddsim.tools.top_crack_paths <rdb_base> <n_file> <par_base> \
+    <conpath> <parpath> <out_dir> [--val <spectrum.val>] [--top N] [--nore]
+```
+
+Verified on real SIPS3002 VA data (the historical `070530.N` as the ranking
+input): the 50 lowest-life doids, reran and written as VTK crack paths,
+with each rerun's own reported life matching max(`N`) in its VTK to within
+one cycle (see above).

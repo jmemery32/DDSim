@@ -2356,6 +2356,23 @@ class Fellipse(Damage):
                             # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid)
         self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
+        # Added 2026 (see docs/PORTING_NOTES.md, "-crack_path"): the
+        # doid's absolute cumulative cycle count N at each RECORDED state in
+        # self.a[i][0], index-aligned with it 1:1 (both grow together, one
+        # entry per real append). Deliberately separate from self.dN, which
+        # (for VarAmp) gets one entry per spectrum cycle checked --
+        # including cycles that don't advance self.a[i][0] at all
+        # (compressive/near-threshold "stall" runs) -- so self.dN can't be
+        # summed to recover which cumulative N a given recorded state
+        # corresponds to; GrowDam's own RK5/Euler path doesn't have that
+        # problem, but this is tracked uniformly for both rather than
+        # relying on that asymmetry. [0.0] here is only correct for a doid's
+        # very first element: when GeometryCheck/WillGrow builds a new one
+        # at a regime transition (e.g. Fellipse -> Hellipse), the caller
+        # (DamMo.py) overwrites this with [the current absolute N] right
+        # after construction, since it's the SAME physical state, just
+        # re-expressed in the new element's own geometry, not N=0 again.
+        self.state_N = [0.0]
 
         # a boolean set to true in self.Rotation() if crack is turned normal to
         # second principal stress... see also
@@ -3281,6 +3298,23 @@ class Hellipse(Damage):
                           # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid) 
         self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
+        # Added 2026 (see docs/PORTING_NOTES.md, "-crack_path"): the
+        # doid's absolute cumulative cycle count N at each RECORDED state in
+        # self.a[i][0], index-aligned with it 1:1 (both grow together, one
+        # entry per real append). Deliberately separate from self.dN, which
+        # (for VarAmp) gets one entry per spectrum cycle checked --
+        # including cycles that don't advance self.a[i][0] at all
+        # (compressive/near-threshold "stall" runs) -- so self.dN can't be
+        # summed to recover which cumulative N a given recorded state
+        # corresponds to; GrowDam's own RK5/Euler path doesn't have that
+        # problem, but this is tracked uniformly for both rather than
+        # relying on that asymmetry. [0.0] here is only correct for a doid's
+        # very first element: when GeometryCheck/WillGrow builds a new one
+        # at a regime transition (e.g. Fellipse -> Hellipse), the caller
+        # (DamMo.py) overwrites this with [the current absolute N] right
+        # after construction, since it's the SAME physical state, just
+        # re-expressed in the new element's own geometry, not N=0 again.
+        self.state_N = [0.0]
 
         # initiate the dadN model & store material to pass to Qellipse
         self.material = material
@@ -3861,6 +3895,23 @@ class Qellipse(Damage):
                           # xyz,delxyz,sigxyz=model.GetNodeInfo(self.doid) 
         self.dN=[] # list of time steps np.sum(self.dN) = Life
         self.nextdN = 0.0
+        # Added 2026 (see docs/PORTING_NOTES.md, "-crack_path"): the
+        # doid's absolute cumulative cycle count N at each RECORDED state in
+        # self.a[i][0], index-aligned with it 1:1 (both grow together, one
+        # entry per real append). Deliberately separate from self.dN, which
+        # (for VarAmp) gets one entry per spectrum cycle checked --
+        # including cycles that don't advance self.a[i][0] at all
+        # (compressive/near-threshold "stall" runs) -- so self.dN can't be
+        # summed to recover which cumulative N a given recorded state
+        # corresponds to; GrowDam's own RK5/Euler path doesn't have that
+        # problem, but this is tracked uniformly for both rather than
+        # relying on that asymmetry. [0.0] here is only correct for a doid's
+        # very first element: when GeometryCheck/WillGrow builds a new one
+        # at a regime transition (e.g. Fellipse -> Hellipse), the caller
+        # (DamMo.py) overwrites this with [the current absolute N] right
+        # after construction, since it's the SAME physical state, just
+        # re-expressed in the new element's own geometry, not N=0 again.
+        self.state_N = [0.0]
 
         # initiate dadN model ** don't bother storing material as attribute! 
         self.dadN=[MydadN.Willenborg(material,1),MydadN.Willenborg(material,1)]
