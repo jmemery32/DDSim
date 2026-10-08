@@ -484,10 +484,9 @@ real validation is constant-amplitude):
    deterministic branch, so `-1` from `VarAmp` never collides with
    `_DamOroContainer`'s own unrelated `-1` "never computed" sentinel.
 
-`-VarAmp` remains serial-only (`-j` is not wired into `Var_Amplitude`) --
-deliberately deferred, since it's unvalidated/unused; only `Fwd_Integration`'s
-loop (deterministic + constant-amplitude Monte Carlo) got multiprocessing
-support in this pass.
+`-VarAmp` was serial-only when this multiprocessing support was first added
+(deliberately deferred at the time) -- see "`-j` wired into `-VarAmp`" further
+down for when and how that changed.
 
 ### Design
 
@@ -917,3 +916,66 @@ Verified on real SIPS3002 VA data (the historical `070530.N` as the ranking
 input): the 50 lowest-life doids, reran and written as VTK crack paths,
 with each rerun's own reported life matching max(`N`) in its VTK to within
 one cycle (see above).
+
+## `-j` wired into `-VarAmp` (2026)
+
+`Var_Amplitude` finally got the same `-j <N>` multiprocessing support
+`Fwd_Integration` (constant amplitude) already had.
+
+### Design
+
+Exactly the same shape as the constant-amplitude support (see
+"Multiprocessing" above), kept as deliberately separate, parallel functions
+rather than branching the existing ones:
+
+* `DDSim.VarAmpOneDoid` -- the per-doid body factored out of
+  `Var_Amplitude`'s `for doid in doid_list:` loop verbatim (same local
+  variables, same logic, zero behavior change), so both the serial driver
+  and the new parallel one call the *same* function -- exactly the pattern
+  `Fwd_Integration` already used for `MonteSimulation`/`FwdDeterministic`.
+  `Var_Amplitude` itself is now just: build the `Spectrum`, loop calling
+  `VarAmpOneDoid`, do the existing `-sv` streamed-per-doid file writes --
+  unchanged in substance, just a thinner wrapper.
+* `parallel._worker_init_va`/`_process_chunk_va`/`run_parallel_va` --
+  siblings of `_worker_init`/`_process_chunk`/`run_parallel`, not branches
+  of them: the two drivers take genuinely different arguments (a spectrum
+  + `nore`, no `Int_type`), and keeping them fully separate means the
+  already-validated constant-amplitude path is completely untouched by
+  this change. Each worker builds its own `VarAmplitude.Spectrum` in its
+  initializer (cheap -- just parsing the `.val` file) alongside its own
+  mesh/`Parameters`/`DamModel`. Same `StripDamElForTransport`-before-return
+  memory-bounding, same merge-into-parent-`DamOro` orchestration, same
+  batched `-sv` output after all workers finish.
+* `DDSim.main()`'s dispatch: `-VarAmp` used to always take the serial path
+  regardless of `-j` (the `elif var_file:` branch came before the
+  `elif num_workers > 1:` one, so the latter was unreachable whenever the
+  former matched). Now `-VarAmp` branches internally on `num_workers > 1`
+  to pick `run_parallel_va` vs. the unchanged serial `Var_Amplitude`.
+
+### Why the Monte Carlo (`monte=1/2`) branch was the real risk here
+
+`VarAmpOneDoid`'s Monte Carlo branch mutates `DamOro[doid]` in a loop --
+simulate the largest particle, then repeatedly `Flush()` and re-simulate
+smaller ones until one doesn't grow (see "A real `Var_Amplitude` behavior
+worth knowing" above) -- rather than computing a result in one shot the
+way `MonteSimulation` does for constant amplitude. That loop had to survive
+being moved, unmodified, into a function a worker process calls once per
+doid in its chunk; nothing about `-j`'s chunking/merging model assumes
+anything about *how* a doid's result was produced, so this worked without
+needing any further change, but it was the part of this refactor worth the
+most scrutiny.
+
+### Verified
+
+* `tests/test_parallel.py`: deterministic and Monte Carlo `-VarAmp -j 3`
+  runs give bit-identical `{doid: (life, will_grow)}` vs. serial on the
+  8-corner cube case (more doids than workers); `-sv` output files
+  (`.N`/`.ai`/`.af`/`.ori`) match byte-for-byte between serial and `-j`
+  for a deterministic run.
+* Full existing suite stays green (223 passed, 5 skipped) -- in particular
+  the pre-existing `-VarAmp` regression tests, confirming the
+  `VarAmpOneDoid` extraction didn't change serial behavior at all.
+* Against real SIPS3002 data (`monte=2`, the real particle-cracking filter,
+  the trickiest case): three real hot-spot doids (119032/119036/121559,
+  ~28,000 particles total across them), serial vs. `-j 3` -- the resulting
+  `.N` files are byte-for-byte identical, 28,081 lines each.

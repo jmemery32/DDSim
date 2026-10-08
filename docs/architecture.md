@@ -55,7 +55,7 @@ picklability fix to cross a process boundary at all) and what it replaces
 | `Vec3D.py`, `ColTensor.py`, `JohnsVectorTools.py` | Vector / symmetric-tensor / list arithmetic. Replace `Vec3D.pyd`, `ColTensor.pyd`, `JohnsVectorTools.pyd` | yes |
 | `DamClass.py` | The three crack-geometry classes (`Fellipse` embedded, `Hellipse` surface, `Qellipse` corner/edge) and their stress-intensity-factor and growth logic | yes, incl. golden-output regression against the pre-port 2006 program |
 | `DamMo.py` | `DamModel`: owns the mesh + per-node damage history, drives `GrowDam`/`SimDamGrowth`; `ToMAPFile`/`ToExodusFile` write results | yes |
-| `parallel.py` | `-j <N>`: partitions the doid list across `N` worker processes, reusing `DDSim.MonteSimulation`/`FwdDeterministic` directly, and merges results back into one `DamModel.DamOro` so every existing output method works unchanged | yes |
+| `parallel.py` | `-j <N>`: partitions the doid list across `N` worker processes, reusing `DDSim.MonteSimulation`/`FwdDeterministic` (constant amplitude) or `DDSim.VarAmpOneDoid` (`-VarAmp`, variable amplitude) directly, and merges results back into one `DamModel.DamOro` so every existing output method works unchanged | yes |
 | `DamHistory.py`, `DamErrors.py` | Small history container / exception classes | yes |
 | `MydadN.py` | NASGRO crack-growth rate + Willenborg retardation (`dadN`/`Willenborg` classes). Replaces the compiled `dadN.pyd` | yes |
 | `Newton.py` | Generic Newton solve used by `Willenborg`'s effective-R iteration | yes |

@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from ddsim import DamMo, Parameters, parallel
-from test_end_to_end import CROSS_ENV_TOL, EXAMPLE, run_driver
+from test_end_to_end import CROSS_ENV_TOL, EXAMPLE, LINE, run_driver
 from test_exodus_end_to_end import cube_model, PAR_DIR
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -256,3 +256,55 @@ def test_var_amplitude_monte_carlo_runs_without_crashing(tmp_path):
          "-VarAmp", "example1.val", "-sv"],
         cwd=work, capture_output=True, text=True, timeout=600)
     assert proc.returncode == 0, proc.stderr[-2000:]
+
+
+# ---------------------------------------------------------------------------
+# -VarAmp -j: wiring -j into variable-amplitude loading (2026). Reuses
+# DDSim.VarAmpOneDoid (the per-doid body factored out of Var_Amplitude for
+# exactly this) via parallel.run_parallel_va -- same pattern, same
+# regression coverage shape, as the constant-amplitude -j tests above.
+# ---------------------------------------------------------------------------
+def _run_va(tmp_path, name, nodes, extra_args, patch_monte=False):
+    work = tmp_path / name
+    shutil.copytree(EXAMPLE, work)
+    (work / "example1.val").write_text(VAL_SPECTRUM)
+    if patch_monte:
+        par = work / "example1.par"
+        par.write_text(par.read_text().replace("monte\n0\n", "monte\n1\n"))
+    proc = subprocess.run(
+        [sys.executable, "-m", "ddsim.DDSim", "-base", "example1",
+         "-conpath", "./", "-parpath", "./", "-v", "-doid_list", nodes,
+         "-VarAmp", "example1.val", "-scale", "100", *extra_args],
+        cwd=work, capture_output=True, text=True, timeout=600)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    got = {int(d): (float(life), int(wg)) for d, life, wg in LINE.findall(proc.stdout)}
+    return work, got
+
+
+def test_var_amplitude_j_matches_serial_deterministic(tmp_path):
+    _work, serial = _run_va(tmp_path, "serial", "0,1,2,3,4,5,6,7", [])
+    _work, parallel_got = _run_va(tmp_path, "parallel", "0,1,2,3,4,5,6,7", ["-j", "3"])
+    assert serial == parallel_got
+    assert len(serial) == 8  # sanity: every doid actually reported a life
+
+
+def test_var_amplitude_j_matches_serial_monte_carlo(tmp_path):
+    """Exercises the Flush()-per-particle sweep (see docs/PORTING_NOTES.md)
+    under -j -- the trickiest part of VarAmpOneDoid to get right, since it
+    mutates DamOro[doid] in a loop rather than computing it in one shot."""
+    _work, serial = _run_va(tmp_path, "serial", "0,1,2,3,4,5,6,7",
+                            ["-seed", "42"], patch_monte=True)
+    _work, parallel_got = _run_va(tmp_path, "parallel", "0,1,2,3,4,5,6,7",
+                                  ["-seed", "42", "-j", "3"], patch_monte=True)
+    assert serial == parallel_got
+    assert len(serial) == 8
+
+
+def test_var_amplitude_j_saveall_files_match_serial(tmp_path):
+    serial, _ = _run_va(tmp_path, "serial", "0,1,2,3,4,5,6,7", ["-sv"])
+    parallel_work, _ = _run_va(tmp_path, "parallel", "0,1,2,3,4,5,6,7",
+                               ["-sv", "-j", "3"])
+    for ext in (".N", ".ai", ".af", ".ori"):
+        a = sorted((serial / ("example1" + ext)).read_text().splitlines())
+        b = sorted((parallel_work / ("example1" + ext)).read_text().splitlines())
+        assert a == b, ext

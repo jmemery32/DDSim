@@ -15,9 +15,10 @@ DamMo._DamOroContainer.StripDamElForTransport() works around it.
 import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-from . import MeshTools, Parameters, DamMo
+from . import MeshTools, Parameters, DamMo, VarAmplitude
 
 _worker_state = None  # set once per worker process by _worker_init
+_worker_state_va = None  # set once per worker process by _worker_init_va
 
 
 def partition_doids(doid_list, num_workers, seed=None):
@@ -136,6 +137,93 @@ def run_parallel(cracks, ais, ais_map, ncr, doid_list, num_workers, conpath,
         # header line, e.g. "Initial_a 0") -- matches Fwd_Integration's
         # serial saveall branch's file format exactly, just written once
         # after all workers finish rather than streamed per-doid.
+        doids = sorted(cracks.DamOro)
+        nfile = open(parpath + filename + '.N', 'a')
+        OrientFile = open(parpath + filename + '.ori', 'a')
+        AiFile = open(parpath + filename + '.ai', 'a')
+        AfFile = open(parpath + filename + '.af', 'a')
+        for doid in doids:
+            cracks.NFile(doid, nfile)
+            cracks.WriteRotations(OrientFile, doid)
+            cracks.WriteInitialAs(AiFile, parameters.N_max, doid)
+            cracks.WriteFinalAs(AfFile, doid)
+        nfile.close()
+        OrientFile.close()
+        AiFile.close()
+        AfFile.close()
+
+
+# ---------------------------------------------------------------------------
+# -VarAmp -j: same design as above, kept as parallel (pun intended), separate
+# functions rather than branching the CA ones, since the two drivers take
+# genuinely different arguments (a spectrum + nore, no int_type) and this
+# keeps the already-validated CA path completely untouched. Added 2026, see
+# docs/PORTING_NOTES.md.
+# ---------------------------------------------------------------------------
+def _worker_init_va(conpath, filename, parpath, exodus_in, verbose, verify,
+                    ais, ais_map, ncr, scale, nore, val_path,
+                    a_b_override=None):
+    """ProcessPoolExecutor initializer for -VarAmp -j: like _worker_init, but
+    also builds this worker's own VarAmplitude.Spectrum (cheap -- just reads
+    and parses the .val file) instead of an Int_type-specific DamModel."""
+    global _worker_state_va
+    if exodus_in:
+        model = MeshTools.MeshTools(exodus_in, 'EXODUS')
+    else:
+        model = MeshTools.MeshTools(conpath + filename, 'RDB')
+    model.SetPointInsideTolerance(1.0e-7)
+    parameters = Parameters.Parameters(filename, parpath)
+    if a_b_override is not None:
+        parameters.a_b = a_b_override
+    cracks = DamMo.DamModel(model, model.GetNodeList(), verbose, verify,
+                            '0', False, parameters, False, False, 'RK5')
+    spec = VarAmplitude.Spectrum(val_path)
+    _worker_state_va = dict(model=model, parameters=parameters, cracks=cracks,
+                           ais=ais, ais_map=ais_map, ncr=ncr, scale=scale,
+                           nore=nore, verbose=verbose, verify=verify,
+                           spec=spec)
+
+
+def _process_chunk_va(doid_chunk):
+    """Runs in a worker process. Reuses DDSim.VarAmpOneDoid directly -- the
+    exact same per-doid body DDSim.Var_Amplitude's serial loop already
+    calls -- so a -j>=2 VA run is provably running the identical per-doid
+    code as -j 1, just split across processes."""
+    from . import DDSim as _ddsim  # deferred: avoids a DDSim<->parallel import cycle
+    s = _worker_state_va
+    cracks = s['cracks']
+    results = {}
+    for doid in doid_chunk:
+        _ddsim.VarAmpOneDoid(doid, s['model'], cracks, s['parameters'],
+            s['spec'], s['verbose'], s['verify'], s['nore'], s['scale'],
+            s['ncr'], s['ais'], s['ais_map'])
+        cracks.DamOro[doid].StripDamElForTransport()
+        results[doid] = cracks.DamOro[doid]
+        del cracks.DamOro[doid]  # bound worker memory, same as _process_chunk
+    return results
+
+
+def run_parallel_va(cracks, ais, ais_map, ncr, doid_list, num_workers,
+                    conpath, filename, parpath, exodus_in, scale, nore,
+                    verify, verbose, parameters, saveall, val_path,
+                    seed=None, a_b_override=None):
+    """Parent-side orchestration for -VarAmp -j, called from DDSim.main() in
+    place of Var_Amplitude when -j N (N>=2) is given. Same merge/-sv-output
+    strategy as run_parallel -- see its own docstring."""
+    num_workers = max(1, min(num_workers, len(doid_list)))
+    chunks = [c for c in partition_doids(list(doid_list), num_workers, seed) if c]
+
+    with ProcessPoolExecutor(max_workers=num_workers, initializer=_worker_init_va,
+            initargs=(conpath, filename, parpath, exodus_in, verbose, verify,
+                      ais, ais_map, ncr, scale, nore, val_path,
+                      a_b_override)) as ex:
+        futures = [ex.submit(_process_chunk_va, chunk) for chunk in chunks]
+        for fut in as_completed(futures):
+            cracks.DamOro.update(fut.result())
+
+    cracks.RefreshLifeBounds()
+
+    if saveall:
         doids = sorted(cracks.DamOro)
         nfile = open(parpath + filename + '.N', 'a')
         OrientFile = open(parpath + filename + '.ori', 'a')

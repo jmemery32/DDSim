@@ -1016,188 +1016,82 @@ def GetFileName(example,default,base,argv):
 
 ###############
 
-def Var_Amplitude(ais,model,cracks,parameters,verbose,\
-                 saveintermediate,parpath,conpath,filename,extension,\
-                 doid_list,errfile_extension,ncr,Scale,nore,verify,ais_map):
-    ''' 
-    cycle-by-cycle variable amplitude loading.  for monte carlo simulation,
-    N is first computed for the largest initial crack size.  the life for the
-    other initial crack sizes is computed as the number of cycles to growth to
-    the next largest crack size plus the other N's
+def VarAmpOneDoid(doid,model,cracks,parameters,Spec,verbose,verify,nore,\
+                  Scale,ncr,ais,ais_map):
+    '''
+    Run the cycle-by-cycle variable-amplitude simulation for a single doid,
+    fully updating cracks.DamOro[doid] (Life; N/ProbFail stats for Monte
+    Carlo; WillGrow) exactly as Var_Amplitude's own per-doid loop body used
+    to do inline. Factored out (2026, see docs/PORTING_NOTES.md) so -j
+    (ddsim.parallel) can call it directly -- the same way Fwd_Integration's
+    loop already reuses MonteSimulation/FwdDeterministic for constant
+    amplitude -- instead of duplicating this logic.
 
-    with -sv, writes job_nam.N file that contains:
-
-    doid rid N
-
-    rules of the *.N file: 
-    1.  at least one row for every doid in doid_list
-    2.  If no computed N's are less than N_max, write rid = -1 and N_max
+    For monte carlo simulation, N is first computed for the largest initial
+    crack size.  the life for the other initial crack sizes is computed as
+    the number of cycles to growth to the next largest crack size plus the
+    other N's
     '''
 
-    Spec=VarAmplitude.Spectrum(conpath+filename+'.val')
     N_max = 1.01*parameters.N_max
 
-    for doid in doid_list: # loop over damage origins (i.e. nodes)
-        if verbose: print("------ doid:", doid," --------")
-        xyz,delxyz,sigxyz=model.GetNodeInfo(doid)
-        # try to catch the doid causing the problem! 
-##        try: 
-        # loop over init_a_sim to get simulation for smallest ai.  
-        if parameters.monte == 1 or parameters.monte == 2:
+    if verbose: print("------ doid:", doid," --------")
+    xyz,delxyz,sigxyz=model.GetNodeInfo(doid)
+    # try to catch the doid causing the problem!
+##        try:
+    # loop over init_a_sim to get simulation for smallest ai.
+    if parameters.monte == 1 or parameters.monte == 2:
 
-            # Get the largest initial a
-            if ais_map:
-                local_ais=MakeLocalAis(ais,ais_map,doid)
+        # Get the largest initial a
+        if ais_map:
+            local_ais=MakeLocalAis(ais,ais_map,doid)
 
-            else: local_ais = ais
+        else: local_ais = ais
 
-            initial_a = local_ais.rv
+        initial_a = local_ais.rv
 
-            # if len(initial_a) == 0, particle filter found no particles
-            # will break at this doid set cracks.DamOro[doid].WillGrow == -1
-            # (which is caught below) and don't do anything else for this doid
-            if len(initial_a) == 0:
-                cracks.AddDamOro(doid,ais)
-                cracks.AddFDam(doid,xyz,1.0,1.0,parameters.material,verbose, \
-                               verify)
-                initial_a = ais.rv
-                cracks.DamOro[doid].WillGrow = -1
+        # if len(initial_a) == 0, particle filter found no particles
+        # will break at this doid set cracks.DamOro[doid].WillGrow == -1
+        # (which is caught below) and don't do anything else for this doid
+        if len(initial_a) == 0:
+            cracks.AddDamOro(doid,ais)
+            cracks.AddFDam(doid,xyz,1.0,1.0,parameters.material,verbose, \
+                           verify)
+            initial_a = ais.rv
+            cracks.DamOro[doid].WillGrow = -1
 
-            # otherwise, do the variable amplitude simulation for the
-            # largest crack
-            else: 
+        # otherwise, do the variable amplitude simulation for the
+        # largest crack
+        else: 
 
-                init_a_sim=[]
-                for set in initial_a:
-                    init_a_sim+=list(set.keys())
+            init_a_sim=[]
+            for set in initial_a:
+                init_a_sim+=list(set.keys())
 
-                init_a_sim.sort()
-                init_a_sim.reverse()
-                # begin with largest ai in random list.
-                ai=init_a_sim[0]
+            init_a_sim.sort()
+            init_a_sim.reverse()
+            # begin with largest ai in random list.
+            ai=init_a_sim[0]
 
-                # creat new Damage Origin... 
-                cracks.AddDamOro(doid,local_ais)
+            # creat new Damage Origin... 
+            cracks.AddDamOro(doid,local_ais)
 
-                # loop over init_a_sim to get simulation for smallest
-                # ai.  
-                aR=parameters.Max_crack_size
-                cracks.AddFDam(doid,xyz,ai,ai,parameters.material,verbose, \
-                               verify)
-                if verbose:
-                    print(' Performing cycle-by-cycle integration for variable')
-                    print('    amplitude loading for largest ai ')
-                N_tot,fin = cracks.VarAmp(doid,aR,parameters.N_max,\
-                                          Spec,nore,Scale,parameters.r)
-                akeep=ai
-
-                if verbose:
-                    af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
-                    print(' ')
-                    print(' For Largest ai:')
-                    print(' doid: ', doid, \
-                          ' Life is:', N_tot, \
-                          ' WillGrow:', cracks.DamOro[doid].WillGrow)
-                    print(' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
-                          ' af, bf: %1.4e, %1.4e' %(af,bf))
-                    print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
-                    print(' ')
-
-            # now post process the results of variable amplitude loading from
-            # the largest ai.  
-
-            # if will_grow parameter is -1 or 0, largest crack will not grow
-            # populate N's with N_max
-            if cracks.DamOro[doid].WillGrow == -1 or \
-               cracks.DamOro[doid].WillGrow == 0:
-                cracks.DamOro[doid].Life=N_max
-                # now loop over the sets
-                for setid in range(parameters.sets):
-                    # add a blank list to set data in statistics  
-                    # instances in __DamOro
-                    cracks.UpdateSet(doid)
-                    for a in initial_a[setid]:
-                        cracks.UpdateSample(doid,a,N_max,setid)
-                    cracks.CalcStats(doid,setid,ncr)
-
-            else:
-                cracks.DamOro[doid].Life=N_tot
-                for setid in range(parameters.sets):
-                    cracks.UpdateSet(doid)
-                    aR=akeep
-                    N_cum=0.0
-                    # assume that when one crack returns WillGrow==0 or -1
-                    # the smaller ones will too.  Use ffwd to check it...
-                    ffwd=0 
-                    reversed_alist=list(initial_a[setid].keys())
-                    reversed_alist.sort()
-                    reversed_alist.reverse()
-                    for a in reversed_alist:
-                        if ffwd==0:
-                            cracks.DamOro[doid].Flush()
-                            cracks.AddFDam(doid,xyz,a,a,\
-                                           parameters.material,\
-                                           verbose,verify)
-                            N,fin = cracks.VarAmp(doid,aR, \
-                                             parameters.N_max-N_tot-N_cum,\
-                                             Spec,nore,Scale,parameters.r)
-
-                        aR=a
-
-                        if cracks.DamOro[doid].WillGrow == 0 or \
-                           cracks.DamOro[doid].WillGrow == -1:
-                            Nai=N_max
-                            ffwd=1
-
-                        elif cracks.DamOro[doid].WillGrow == 1:
-                            Nai=N+N_tot+N_cum
-                            N_cum+=N
-
-                        else: Nai=N
-
-                        cracks.UpdateSample(doid,a,Nai,setid)
-
-                        if verbose:
-                            af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
-                            print(' ')
-                            print(' doid: ', doid, \
-                                  ' Life (for this interval):', N, \
-                                  ' WillGrow:', cracks.DamOro[doid].WillGrow)
-                            print(' ai, bi: %1.4e, %1.4e' %(a,a),'-->',\
-                                  ' af, bf: %1.4e, %1.4e' %(af,bf))
-                            print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
-                            print(' ')
-
-                    cracks.CalcStats(doid,setid,ncr)
-
-        else: # as in, deterministic fatigue simulation...
-            cracks.AddDamOro(doid)
-            ai=parameters.a_b[0][0]
+            # loop over init_a_sim to get simulation for smallest
+            # ai.  
             aR=parameters.Max_crack_size
             cracks.AddFDam(doid,xyz,ai,ai,parameters.material,verbose, \
                            verify)
+            if verbose:
+                print(' Performing cycle-by-cycle integration for variable')
+                print('    amplitude loading for largest ai ')
             N_tot,fin = cracks.VarAmp(doid,aR,parameters.N_max,\
                                       Spec,nore,Scale,parameters.r)
-            # (bug fix, 2026: this used to never be assigned in the
-            # deterministic branch -- unlike the two Monte Carlo branches
-            # above, which set it explicitly -- so NFile's non-monte branch
-            # would silently write the -1 "never computed" sentinel for
-            # every doid processed here. Mirrors the Monte Carlo branches'
-            # own convention just above: VarAmp returns N_tot=-1 as its own
-            # sentinel for "reached N_max without growing" (WillGrow set to
-            # 0 in that case, or -1 for a compressive/never-grew field), so
-            # that must map to N_max here too, not be stored literally as
-            # -1 -- which would collide with _DamOroContainer's unrelated
-            # "never computed" default. See docs/PORTING_NOTES.md.)
-            if cracks.DamOro[doid].WillGrow == -1 or \
-               cracks.DamOro[doid].WillGrow == 0:
-                cracks.DamOro[doid].Life=N_max
-            else:
-                cracks.DamOro[doid].Life=N_tot
+            akeep=ai
 
             if verbose:
                 af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
                 print(' ')
+                print(' For Largest ai:')
                 print(' doid: ', doid, \
                       ' Life is:', N_tot, \
                       ' WillGrow:', cracks.DamOro[doid].WillGrow)
@@ -1205,6 +1099,134 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
                       ' af, bf: %1.4e, %1.4e' %(af,bf))
                 print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
                 print(' ')
+
+        # now post process the results of variable amplitude loading from
+        # the largest ai.  
+
+        # if will_grow parameter is -1 or 0, largest crack will not grow
+        # populate N's with N_max
+        if cracks.DamOro[doid].WillGrow == -1 or \
+           cracks.DamOro[doid].WillGrow == 0:
+            cracks.DamOro[doid].Life=N_max
+            # now loop over the sets
+            for setid in range(parameters.sets):
+                # add a blank list to set data in statistics  
+                # instances in __DamOro
+                cracks.UpdateSet(doid)
+                for a in initial_a[setid]:
+                    cracks.UpdateSample(doid,a,N_max,setid)
+                cracks.CalcStats(doid,setid,ncr)
+
+        else:
+            cracks.DamOro[doid].Life=N_tot
+            for setid in range(parameters.sets):
+                cracks.UpdateSet(doid)
+                aR=akeep
+                N_cum=0.0
+                # assume that when one crack returns WillGrow==0 or -1
+                # the smaller ones will too.  Use ffwd to check it...
+                ffwd=0 
+                reversed_alist=list(initial_a[setid].keys())
+                reversed_alist.sort()
+                reversed_alist.reverse()
+                for a in reversed_alist:
+                    if ffwd==0:
+                        cracks.DamOro[doid].Flush()
+                        cracks.AddFDam(doid,xyz,a,a,\
+                                       parameters.material,\
+                                       verbose,verify)
+                        N,fin = cracks.VarAmp(doid,aR, \
+                                         parameters.N_max-N_tot-N_cum,\
+                                         Spec,nore,Scale,parameters.r)
+
+                    aR=a
+
+                    if cracks.DamOro[doid].WillGrow == 0 or \
+                       cracks.DamOro[doid].WillGrow == -1:
+                        Nai=N_max
+                        ffwd=1
+
+                    elif cracks.DamOro[doid].WillGrow == 1:
+                        Nai=N+N_tot+N_cum
+                        N_cum+=N
+
+                    else: Nai=N
+
+                    cracks.UpdateSample(doid,a,Nai,setid)
+
+                    if verbose:
+                        af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
+                        print(' ')
+                        print(' doid: ', doid, \
+                              ' Life (for this interval):', N, \
+                              ' WillGrow:', cracks.DamOro[doid].WillGrow)
+                        print(' ai, bi: %1.4e, %1.4e' %(a,a),'-->',\
+                              ' af, bf: %1.4e, %1.4e' %(af,bf))
+                        print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
+                        print(' ')
+
+                cracks.CalcStats(doid,setid,ncr)
+
+    else: # as in, deterministic fatigue simulation...
+        cracks.AddDamOro(doid)
+        ai=parameters.a_b[0][0]
+        aR=parameters.Max_crack_size
+        cracks.AddFDam(doid,xyz,ai,ai,parameters.material,verbose, \
+                       verify)
+        N_tot,fin = cracks.VarAmp(doid,aR,parameters.N_max,\
+                                  Spec,nore,Scale,parameters.r)
+        # (bug fix, 2026: this used to never be assigned in the
+        # deterministic branch -- unlike the two Monte Carlo branches
+        # above, which set it explicitly -- so NFile's non-monte branch
+        # would silently write the -1 "never computed" sentinel for
+        # every doid processed here. Mirrors the Monte Carlo branches'
+        # own convention just above: VarAmp returns N_tot=-1 as its own
+        # sentinel for "reached N_max without growing" (WillGrow set to
+        # 0 in that case, or -1 for a compressive/never-grew field), so
+        # that must map to N_max here too, not be stored literally as
+        # -1 -- which would collide with _DamOroContainer's unrelated
+        # "never computed" default. See docs/PORTING_NOTES.md.)
+        if cracks.DamOro[doid].WillGrow == -1 or \
+           cracks.DamOro[doid].WillGrow == 0:
+            cracks.DamOro[doid].Life=N_max
+        else:
+            cracks.DamOro[doid].Life=N_tot
+
+        if verbose:
+            af,bf,ka,kb=fin[0],fin[1],fin[2],fin[3]
+            print(' ')
+            print(' doid: ', doid, \
+                  ' Life is:', N_tot, \
+                  ' WillGrow:', cracks.DamOro[doid].WillGrow)
+            print(' ai, bi: %1.4e, %1.4e' %(ai,ai),'-->',\
+                  ' af, bf: %1.4e, %1.4e' %(af,bf))
+            print(' K(a), K(b): %1.4e, %1.4e' %(ka,kb))
+            print(' ')
+
+######## Var_Amplitude
+
+def Var_Amplitude(ais,model,cracks,parameters,verbose,\
+                 saveintermediate,parpath,conpath,filename,extension,\
+                 doid_list,errfile_extension,ncr,Scale,nore,verify,ais_map):
+    '''
+    Serial driver: runs VarAmpOneDoid for every doid in doid_list, then (if
+    saveall) writes the same job_name.N/.ori/.ai/.af files as the constant-
+    amplitude Fwd_Integration loop, streamed per doid.
+
+    with -sv, writes job_nam.N file that contains:
+
+    doid rid N
+
+    rules of the *.N file:
+    1.  at least one row for every doid in doid_list
+    2.  If no computed N's are less than N_max, write rid = -1 and N_max
+    '''
+
+    Spec=VarAmplitude.Spectrum(conpath+filename+'.val')
+
+    for doid in doid_list: # loop over damage origins (i.e. nodes)
+        VarAmpOneDoid(doid,model,cracks,parameters,Spec,verbose,verify,\
+                     nore,Scale,ncr,ais,ais_map)
 
         # life prediction for doid is complete ---> now postprocess.
 
@@ -1224,14 +1246,6 @@ def Var_Amplitude(ais,model,cracks,parameters,verbose,\
             AfFile = open(parpath+filename+'.af','a')
             cracks.WriteFinalAs(AfFile,doid)
             AfFile.close()
-
-##        # if we catch it, good, else, keep going!  
-##        except:
-##            print "BARF--->:",doid 
-##            errfile_name=parpath+filename+".D"+errfile_extension
-##            errfile=open(errfile_name,'a')
-##            errfile.write(str(doid)+"\n")
-##            errfile.close()
 
 ############## top ##################
 
@@ -1340,10 +1354,21 @@ def main():
         else:
             print(' Variable Amplitude loading... Willenborg retardation model')
             print(' ')
-        Var_Amplitude(ais,model,cracks,parameters,verbose,\
-                      saveintermediate,parpath,conpath,filename,extension, \
-                      doid_list,errfile_extension,ncr,scale,nore,verify, \
-                      ais_map)
+        if num_workers > 1:
+            from . import parallel
+            print(" (%d worker processes)" % num_workers)
+            print(' ')
+            parallel.run_parallel_va(cracks,ais,ais_map,ncr,doid_list,\
+                                     num_workers,conpath,filename,parpath,\
+                                     exodus_in,scale,nore,verify,verbose,\
+                                     parameters,cracks.saveall,\
+                                     conpath+filename+'.val',seed,\
+                                     a_b_override)
+        else:
+            Var_Amplitude(ais,model,cracks,parameters,verbose,\
+                          saveintermediate,parpath,conpath,filename,extension, \
+                          doid_list,errfile_extension,ncr,scale,nore,verify, \
+                          ais_map)
     elif num_workers > 1:
         from . import parallel
         print(" Using an Adaptive RK-5 Forward integration scheme...")

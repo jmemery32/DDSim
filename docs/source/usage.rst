@@ -57,10 +57,10 @@ Running faster: ``-j``
 
 splits ``doid_list`` across ``4`` worker processes on the local machine
 (:mod:`ddsim.parallel`), replacing the original Windows/MPI cluster
-workflow. Results are bit-identical to a serial run; see
-``docs/PORTING_NOTES.md`` for the design and two real bugs this port found
-and fixed along the way. Omit ``-j`` (or pass ``-j 1``) for today's plain
-serial behavior.
+workflow -- for constant *or* variable amplitude (``-VarAmp``) alike.
+Results are bit-identical to a serial run; see ``docs/PORTING_NOTES.md``
+for the design and the real bugs this port found and fixed along the way.
+Omit ``-j`` (or pass ``-j 1``) for today's plain serial behavior.
 
 Visualizing results in ParaView
 ----------------------------------
