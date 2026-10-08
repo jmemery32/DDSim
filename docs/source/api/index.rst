@@ -53,4 +53,5 @@ Tools
    ddsim.tools.twins
    ddsim.tools.rdb_to_exodus
    ddsim.tools.n_to_exodus
+   ddsim.tools.exodus_to_n
    ddsim.tools.top_crack_paths

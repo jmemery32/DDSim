@@ -23,7 +23,7 @@ behavioral difference.
 
 ## Status
 
-**Level I is ported, numba-accelerated, and tested** (224 tests: unit tests
+**Level I is ported, numba-accelerated, and tested** (233 tests: unit tests
 for every module, golden-output regression against the *actual captured
 stdout of the original 2006 program*, and a validation suite against the
 published dissertation's real 140k-element coupon model). Levels II and III
@@ -32,15 +32,21 @@ unmaintained, in `legacy/level2_level3_prototype/` — not part of the
 supported package.
 
 DDSim can also read a real Exodus II stress field as input (`-exodus <path>`,
-alongside the original ASCII "RDB" format: `.con`/`.nod`/`.sig`/`.smp`/`.edg`)
-and write predicted life back out as an Exodus nodal variable
-(`-exodus_out <path>`), viewable directly as a contour plot in ParaView.
-Linear elements only for now (every real DDSim mesh uses them) — see
+alongside the original ASCII "RDB" format: `.con`/`.nod`/`.sig`/`.smp`/`.edg`),
+and **writes predicted life back out as an Exodus nodal variable by
+default** — every run produces `<filename>.exo`, viewable directly as a
+contour plot in ParaView, unless the mesh has elements Exodus output
+doesn't support yet (see below), in which case the automatic write is
+skipped with a one-line note. `-exodus_out <path>` picks a different
+output path; `-sv` additionally writes the old `.N`/`.ai`/`.af`/`.ori` text
+files. Linear elements only for now (every real DDSim mesh uses them) — see
 `docs/PORTING_NOTES.md` for the node-order verification and scope, and for
 three real ParaView/VTK-reader bugs found (and fixed) converting the actual
 SIPS3002 model. `ddsim.tools.n_to_exodus` visualizes real *already-computed*
 result files (`.N`, from the actual 2007 parallel runs) the same way, with no
-crack growth simulation involved.
+crack growth simulation involved; `ddsim.tools.exodus_to_n` goes the other
+way, pulling a nodal variable back out of an Exodus file as a `.N`-style
+text file.
 
 DDSim can run a doid list across multiple worker processes on a single
 machine (`-j <N>`), replacing the original Windows-cluster/MPI parallel

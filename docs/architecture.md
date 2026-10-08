@@ -66,6 +66,7 @@ picklability fix to cross a process boundary at all) and what it replaces
 | `tools/twins.py` | ANSYS→`.sig` conversion; merges per-process output files from the old parallel workflow | no |
 | `tools/rdb_to_exodus.py` | Converts an RDB mesh (+ its `.sig` stress) to Exodus for visualization -- no crack growth involved. `python -m ddsim.tools.rdb_to_exodus <rdb_base> <out.exo>` | yes |
 | `tools/n_to_exodus.py` | Aggregates a real `.N` life-prediction result file (real captured 2007 Monte Carlo output, `doid rid N` per line) onto its RDB mesh as a nodal variable -- per-node arithmetic mean, matching `Statistic.StatN.SampleMean`; no crack growth run. `python -m ddsim.tools.n_to_exodus <rdb_base> <n_file> <out.exo> [var_name]` | yes |
+| `tools/exodus_to_n.py` | The reverse of `n_to_exodus.py`: pulls one nodal variable (default `"life"`) back out of an Exodus file as a `.N`-style text file (`doid -1 value` per node -- Exodus has no per-particle breakdown to recover). `python -m ddsim.tools.exodus_to_n <exodus_file> <out.N> [var_name]` | yes |
 | `tools/top_crack_paths.py` | Finds the `N` lowest-life doids from an existing `.N` file and writes each one's own representative crack-growth history as a `-crack_path`-style VTK file, from one mesh load. `python -m ddsim.tools.top_crack_paths <rdb_base> <n_file> <par_base> <conpath> <parpath> <out_dir> [--val <spectrum.val>] [--top N]` | yes |
 
 `legacy/unused_modules/` (`Contour.py`, `Interpolator.py`, `InterpTable.py`,

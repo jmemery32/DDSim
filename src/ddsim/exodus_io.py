@@ -117,9 +117,15 @@ def _read_coords(ds):
     return np.column_stack([np.asarray(ds.variables["coord" + a][:]) for a in "xyz"]).astype(float)
 
 
-def _num_map(ds, name, count):
+def _num_map(ds, name, count, offset_attr=None):
+    """Read an external ID map (node_num_map/elem_num_map), undoing the
+    shift write_exodus recorded under offset_attr (a ddsim_node_offset/
+    ddsim_elem_offset global attribute) if present -- absent (a file from
+    before that was recorded, or one not written by write_exodus at all),
+    this is a no-op, so the shifted ID comes back as-is, same as always."""
+    offset = int(getattr(ds, offset_attr, 0)) if offset_attr else 0
     if name in ds.variables:
-        return [int(v) for v in ds.variables[name][:]]
+        return [int(v) - offset for v in ds.variables[name][:]]
     return list(range(1, count + 1))
 
 
@@ -136,11 +142,14 @@ def read_exodus(path, time_step=-1, stress_names=None):
     with netCDF4.Dataset(path) as ds:
         coords = _read_coords(ds)
         n_nodes = coords.shape[0]
-        node_ids = np.array(_num_map(ds, "node_num_map", n_nodes), dtype=np.int64)
+        node_ids = np.array(_num_map(ds, "node_num_map", n_nodes,
+                                     "ddsim_node_offset"), dtype=np.int64)
 
         elem_ids, elem_types, connectivity = [], [], []
         n_blk = len(ds.dimensions["num_el_blk"]) if "num_el_blk" in ds.dimensions else 0
-        running_elem_id = iter(_num_map(ds, "elem_num_map", int(ds.dimensions["num_elem"].size)))
+        running_elem_id = iter(_num_map(ds, "elem_num_map",
+                                        int(ds.dimensions["num_elem"].size),
+                                        "ddsim_elem_offset"))
         for b in range(1, n_blk + 1):
             conn_var = ds.variables["connect%d" % b]
             raw_type = conn_var.elem_type.strip().upper()
@@ -170,6 +179,45 @@ def read_exodus(path, time_step=-1, stress_names=None):
             stress=stress, meta={"format": "EXODUS", "path": str(path)})
         data.validate()
         return data
+
+
+def read_nodal_variable(path, var_name, time_step=-1):
+    """Read one named nodal variable (as written by write_exodus's
+    ``nodal_vars``, e.g. ``ToExodusFile``'s ``"life"``) back out of an
+    Exodus II file: ``{node_id: value}``. The reverse direction of
+    ``write_exodus`` for exactly this one piece of it -- unlike
+    ``read_exodus``, this doesn't need the mesh/connectivity at all, just
+    ``node_num_map`` and the matching ``vals_nod_var<i>``.
+
+    ``node_id`` here is the original DDSim doid, even for a mesh that
+    needed shifting to satisfy Exodus's positive-ID requirement (every
+    real mesh checked so far, SIPS3002 included: it has an unrelated node
+    whose ID is 0, so the whole mesh's IDs get shifted together) -- this
+    reads the ``ddsim_node_offset`` attribute ``write_exodus`` records and
+    undoes it. A file without that attribute (written before this fix, or
+    by something other than this package) reads back un-adjusted, same as
+    always.
+
+    ``time_step``: which time step to read (default: the last one -- every
+    file this package writes has exactly one).
+    """
+    import netCDF4
+
+    with netCDF4.Dataset(path) as ds:
+        n_nodes = int(ds.dimensions["num_nodes"].size)
+        node_ids = np.array(_num_map(ds, "node_num_map", n_nodes,
+                                     "ddsim_node_offset"), dtype=np.int64)
+        if "name_nod_var" not in ds.variables:
+            raise KeyError("%s has no nodal variables at all" % path)
+        names = ["".join(c.decode() for c in row if c).strip()
+                 for row in ds.variables["name_nod_var"][:]]
+        if var_name not in names:
+            raise KeyError("no nodal variable %r in %s (have: %s)" %
+                           (var_name, path, ", ".join(names)))
+        idx = names.index(var_name) + 1  # vals_nod_var<idx>, 1-based
+        values = np.asarray(ds.variables["vals_nod_var%d" % idx][time_step, :],
+                            dtype=float)
+    return {int(nid): float(v) for nid, v in zip(node_ids, values)}
 
 
 def _read_stress(ds, n_nodes, time_step, stress_names):
@@ -216,12 +264,15 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
     ``mesh.node_ids``/``mesh.elem_ids`` are written into Exodus's external ID
     maps (``node_num_map``/``elem_num_map``) shifted by the smallest constant
     needed to make them 1-based, if they aren't already (DDSim's native RDB
-    IDs are 0-based). Exodus readers require positive IDs there; ParaView/VTK
-    silently drops an entire element block rather than erroring when it sees
-    a 0, which is what "opens fine, empty/broken on Apply" looks like. This
-    means ``read_exodus(write_exodus(...))`` does not reproduce 0-based IDs
-    bit-for-bit -- they come back shifted by +1 -- which is fine for our own
-    use (visualization) but worth knowing if you need the IDs to match.
+    IDs are 0-based, and even a real mesh like SIPS3002 has some unrelated
+    node whose ID is 0, shifting the whole mesh). Exodus readers require
+    positive IDs there; ParaView/VTK silently drops an entire element block
+    rather than erroring when it sees a 0, which is what "opens fine,
+    empty/broken on Apply" looks like. The shift amount is recorded as a
+    ``ddsim_node_offset``/``ddsim_elem_offset`` global attribute, which
+    ``read_exodus``/``read_nodal_variable`` undo automatically -- so despite
+    the shift on disk, ``read_exodus(write_exodus(...))`` (or
+    ``read_nodal_variable``) does reproduce the original IDs.
     """
     import netCDF4
 
@@ -299,6 +350,15 @@ def write_exodus(path, mesh, nodal_vars, default=0.0, title="ddsim output"):
         # necessary, so IDs that are already positive round-trip unchanged.
         node_offset = 1 - min(int(n) for n in mesh.node_ids) if min(mesh.node_ids) <= 0 else 0
         elem_offset = 1 - min(int(e) for e in mesh.elem_ids) if min(mesh.elem_ids) <= 0 else 0
+        # Recorded so read_exodus/read_nodal_variable can undo this shift
+        # and hand back the original ID transparently -- found to matter in
+        # practice, not just for an originally-0-based toy mesh: the real
+        # SIPS3002 mesh also has a node ID of 0 (some other, unrelated node;
+        # every ID in the mesh shifts together), so this shift was silently
+        # affecting every real doid too, not a rare edge case. Absent (old
+        # files written before this) reads back as offset 0, a no-op.
+        ds.ddsim_node_offset = np.int32(node_offset)
+        ds.ddsim_elem_offset = np.int32(elem_offset)
         node_num_map[:] = [int(n) + node_offset for n in mesh.node_ids]
 
         elem_pos = 0

@@ -96,6 +96,9 @@ def HelpPrints():
     print("           parameters still come from the usual .par file.")
     print(" -exodus_out <path> -> write predicted life as an Exodus II nodal")
     print("           variable (\"life\"), viewable directly in ParaView etc.")
+    print("           This happens by DEFAULT even without this flag, to")
+    print("           <filename>.exo -- pass this only to pick a different")
+    print("           path. See -sv for the old text-file output instead.")
     
 
 #############
@@ -1438,8 +1441,28 @@ def main():
             MAPFile = open(parpath+filename+'.MP','w')
             cracks.ToMAPFile(MAPFile)
 
-    if exodus_out: # -exodus_out <path>
+    # Exodus is the default output format (2026, see docs/PORTING_NOTES.md):
+    # -exodus_out <path> still controls exactly where/whether explicitly, but
+    # absent that, every run writes one to parpath+filename+'.exo' anyway --
+    # -sv remains the separate opt-in for the old .N/.ai/.af/.ori text files.
+    exodus_out_explicit = exodus_out is not None
+    if exodus_out is None:
+        exodus_out = parpath+filename+'.exo'
+    try:
         cracks.ToExodusFile(exodus_out,0 if parameters.monte else None)
+        if not exodus_out_explicit:
+            print(' Wrote life predictions to', exodus_out)
+    except NotImplementedError as message:
+        # Only swallow this for the automatic default -- an explicit
+        # -exodus_out <path> that can't be written should still fail loudly.
+        if exodus_out_explicit:
+            raise
+        print(' ')
+        print(' NOTE: skipped automatic Exodus output (%s).' % message)
+        print('       Pass -sv for the old text-file output instead, or see')
+        print('       exodus_io.py (linear elements only -- TET_4/WEDGE_6/')
+        print('       BRICK_8) for what a mesh needs for this to work.')
+        print(' ')
 
     # print crack front points to a text file named filename.front
     if crack_front: # -cf

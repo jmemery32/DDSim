@@ -8,4 +8,4 @@ src/ddsim/.
 
 
 def test_tools_modules_import():
-    from ddsim.tools import PDF, twins, top_crack_paths  # noqa: F401
+    from ddsim.tools import PDF, twins, top_crack_paths, exodus_to_n  # noqa: F401

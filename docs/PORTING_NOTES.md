@@ -979,3 +979,88 @@ most scrutiny.
   the trickiest case): three real hot-spot doids (119032/119036/121559,
   ~28,000 particles total across them), serial vs. `-j 3` -- the resulting
   `.N` files are byte-for-byte identical, 28,081 lines each.
+
+## Exodus as the default output format (2026)
+
+Previously, a run with no output flags at all wrote nothing persistent;
+`-sv` opted into the old `.N`/`.ai`/`.af`/`.ori` text files, and
+`-exodus_out <path>` separately opted into Exodus. Now every run writes
+Exodus output by default, to `parpath+filename+'.exo'` unless
+`-exodus_out <path>` picks a different path; `-sv` is unchanged (still
+opts into the old text files, additively, not instead of Exodus).
+
+Implemented as a small change to `DDSim.main()`'s existing post-dispatch
+`if exodus_out:` block, which already ran after every dispatch branch
+(serial or `-j`, constant or variable amplitude) once `cracks.DamOro` was
+fully populated: default `exodus_out` to the auto-path when not given, and
+wrap the `ToExodusFile` call in a `try/except NotImplementedError` --
+*only* swallowed for the automatic default (an explicit `-exodus_out` that
+fails still raises, since that was a direct request). This matters in
+practice: `example1`'s own mesh uses `TET_10` (quadratic) elements, which
+`exodus_io.py` doesn't support (see its own module docstring) -- without
+the graceful fallback, every single existing `example1`-based use (CLI and
+test) would start failing outright the moment Exodus became unconditional.
+Confirmed: `example1` now prints a one-line note and continues (no file
+written, run still succeeds); a real linear-element mesh (SIPS3002)
+writes `<filename>.exo` and prints where. Full suite (which runs `example1`
+extensively) stays green with this change -- 228 passed, 5 skipped.
+
+### A real pre-existing bug this surfaced: the ID-shift was silently live on real data too
+
+Found while building the companion "pull life back out of Exodus" tool
+below, via a direct (non-Exodus) sanity check that didn't match: the real
+SIPS3002 mesh has a node whose ID happens to be `0` (some unrelated node,
+not any of the doids being checked) -- and `write_exodus`'s "shift every
+ID by the minimal amount needed to make them positive" logic (added
+earlier -- Exodus requires strictly positive external IDs, and ParaView/VTK
+silently drops an entire element block rather than erroring on a `0`)
+shifts *every* ID in the mesh together once *any* one of them is `<= 0`.
+So real doids were already being silently shifted by the Exodus round trip
+before this session, not just an originally-0-based toy fixture -- a doid
+look-up against a `write_exodus`-produced file's raw `node_num_map` was
+off by a constant for the *whole real SIPS3002 mesh*, confirmed concretely:
+a direct `.N`-file mean for doid 119032 is `32844.85`, but reading it back
+via the then-current `read_nodal_variable` under the key `119032` returned
+`34017.33` -- the value that belonged to doid `119031`.
+
+Fixed properly rather than just documented: `write_exodus` now records the
+shift amount it used as `ddsim_node_offset`/`ddsim_elem_offset` global
+netCDF attributes, and `read_exodus`/`read_nodal_variable` (both go through
+the shared `_num_map` helper) undo it automatically. A file without those
+attributes (written before this fix, or by something other than this
+package) reads back un-adjusted, same as always -- purely additive, no
+existing test needed to change (the hand-written fixtures those tests use
+all already have positive IDs, so the shift -- and this fix -- is a no-op
+for them; confirmed by grepping every existing use of `read_exodus`/raw
+`node_num_map` reads for one that depended on the old, now-corrected,
+shifted return value -- none did). Re-verified against real SIPS3002 data:
+the same doid 119032 round trip now returns `32844.85`, matching the
+direct `.N`-file computation exactly.
+
+## `ddsim.tools.exodus_to_n`: the reverse of `n_to_exodus` (2026)
+
+`n_to_exodus` goes `.N` -> Exodus; nothing went the other way. Now
+`exodus_to_n` pulls one named nodal variable (default `"life"`) back out
+of an Exodus file as a `.N`-style text file. Exodus stores one aggregated
+value per node with no per-particle breakdown, so the output always has
+exactly one line per node, `rid=-1` -- the same convention `NFile`'s own
+non-Monte-Carlo branch already uses for "a single, non-particle-specific
+value." A node written as NaN (`ToExodusFile`'s "never run" sentinel) is
+skipped entirely, matching a doid that was never in `doid_list`, not one
+that ran and got an explicit `-1`.
+
+```
+python -m ddsim.tools.exodus_to_n <exodus_file> <out.N> [var_name]
+```
+
+Built on a new, generic `exodus_io.read_nodal_variable(path, var_name)` --
+unlike `read_exodus`, it doesn't need the mesh/connectivity at all, just
+`node_num_map` and the matching `vals_nod_var<i>`. Building and testing this
+against real data is exactly what surfaced the ID-shift bug above.
+
+Verified: `tests/test_exodus_to_n.py` -- round-trips through `n_to_exodus`
+and back (original doid numbers intact); a direct regression test for the
+ID-shift fix (checks the raw on-disk IDs really are shifted, then that the
+high-level reader still recovers the original ones); raises clearly on an
+unknown variable name. Also checked directly against real SIPS3002 data
+(see above).

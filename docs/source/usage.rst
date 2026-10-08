@@ -65,11 +65,22 @@ Omit ``-j`` (or pass ``-j 1``) for today's plain serial behavior.
 Visualizing results in ParaView
 ----------------------------------
 
-``-exodus_out <path>`` writes predicted life as an Exodus II nodal variable,
-directly viewable as a contour plot in ParaView (``-exodus <path>`` reads
-an Exodus mesh/stress field as input, instead of the original ASCII RDB
-format). ``ddsim.tools.n_to_exodus`` does the same for an already-computed
-``.N`` result file, with no simulation involved.
+Exodus is the default output format: every run writes predicted life as an
+Exodus II nodal variable to ``<filename>.exo`` automatically, directly
+viewable as a contour plot in ParaView. ``-exodus_out <path>`` picks a
+different path; ``-exodus <path>`` reads an Exodus mesh/stress field as
+*input* instead of the original ASCII RDB format. ``-sv`` additionally
+writes the old ``.N``/``.ai``/``.af``/``.ori`` text files, for anything
+still built around them.
+
+If the mesh has elements Exodus output doesn't support yet (quadratic --
+``TET_10``/``WEDGE_15``/``HEX_20``, e.g. the bundled ``example1``), the
+automatic write is skipped with a one-line note instead of failing the
+run; an *explicit* ``-exodus_out <path>`` still raises, since that was a
+direct request. ``ddsim.tools.n_to_exodus`` writes the same kind of file
+for an already-computed ``.N`` result file, with no simulation involved;
+``ddsim.tools.exodus_to_n`` goes the other way, pulling a nodal variable
+back out of an Exodus file as a ``.N``-style text file.
 
 ``-crack_path <path>`` (single doid, no ``-j``) writes that node's full
 crack-growth history as a legacy VTK PolyData file -- one polyline per
