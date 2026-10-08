@@ -84,3 +84,14 @@ predicted crack path itself, loaded in ParaView alongside the Exodus mesh:
 See :meth:`ddsim.DamMo.DamModel.WriteCrackPathVTK` and
 ``docs/PORTING_NOTES.md`` for how the per-step cycle count is reconstructed
 and why this only works without ``-j``.
+
+To see the *N most critical* crack paths over a whole model at once (e.g.
+"the 50 lowest-life nodes") rather than one doid you already picked,
+:mod:`ddsim.tools.top_crack_paths` ranks doids by life from an existing
+``.N`` result file and writes each one's own representative crack path --
+all from a single mesh load:
+
+.. code-block:: console
+
+   $ python -m ddsim.tools.top_crack_paths SIPS3002 historical.N sips3002 \
+         ./ ./ ./out_dir --val sips3002.val --top 50

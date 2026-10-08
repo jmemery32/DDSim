@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from ddsim import DamMo, Parameters, parallel
-from test_end_to_end import EXAMPLE, run_driver
+from test_end_to_end import CROSS_ENV_TOL, EXAMPLE, run_driver
 from test_exodus_end_to_end import cube_model, PAR_DIR
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -167,7 +167,7 @@ def test_j_matches_serial_golden_values(tmp_path):
     assert set(got) == set(expected)
     for doid, (life, will_grow) in expected.items():
         assert got[doid][1] == will_grow
-        assert got[doid][0] == pytest.approx(life, rel=1e-9)
+        assert got[doid][0] == pytest.approx(life, rel=CROSS_ENV_TOL)
 
 
 def test_j_matches_serial_with_more_doids_than_workers(tmp_path):
@@ -177,7 +177,7 @@ def test_j_matches_serial_with_more_doids_than_workers(tmp_path):
     assert sorted(got) == list(range(8))
     assert all(got[d][1] == 4 for d in range(8))
     lives = [got[d][0] for d in range(8)]
-    assert lives == pytest.approx([79.14869788864108] * 8, rel=1e-8)
+    assert lives == pytest.approx([79.14869788864108] * 8, rel=CROSS_ENV_TOL)
 
 
 def _run_saveall(tmp_path, name, nodes, scale, extra_args, patch_monte=False):
