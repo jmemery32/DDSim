@@ -13,7 +13,12 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",
-    "numba",
+    # numba>=0.63 dropped prebuilt wheels for Intel macOS (source-only,
+    # needing a local LLVM/cmake toolchain) -- 0.62.1 is the newest release
+    # that still ships one. Pinned so `pip install` alone (no conda) works
+    # on Intel Mac without a compiler; revisit if that platform's wheels
+    # come back, or relax further once Intel Mac support no longer matters.
+    "numba>=0.58,<0.63",
 ]
 
 [project.optional-dependencies]

@@ -50,22 +50,25 @@ neither affects any previously-validated result).
 
 ## Install
 
+Plain `pip`, no conda needed -- requires Python >= 3.10 on `PATH`:
+
 ```bash
 git clone git@github.com:jmemery32/DDSim.git
 cd DDSim
-make env              # conda env create/update + editable pip install of ddsim
-conda activate ddsim
+make venv                    # creates .venv/, installs ddsim + every extra into it
+source .venv/bin/activate
 ```
 
-`make env` needs conda (or miniconda/mamba) on `PATH` and runs
-`conda env update -f environment.yml -n ddsim`, which creates the `ddsim`
-conda environment (Python, numpy, scipy, numba, netCDF4, matplotlib, pytest)
-and then `pip install`s this repository into it in editable mode.
+(`numba`, the only dependency with any native-build risk, is pinned to a
+version range that still ships prebuilt wheels for every common platform
+--- see the comment in `pyproject.toml` if you ever need to revisit that.)
 
-Already have a Python environment with numpy/scipy/numba? Skip conda and just run:
+Already have a Python environment you'd rather use (conda or otherwise)?
+Skip `make venv` and just run, inside it:
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"            # core + test dependencies
+pip install -e ".[dev,exodus,plotting]"  # + Exodus II I/O, Weibull plotting
 ```
 
 ## Quickstart
