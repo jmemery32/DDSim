@@ -1,0 +1,52 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install ddsim (+ test, Exodus II, and plotting extras)
+        run: pip install -e ".[dev,exodus,plotting]"
+
+      - name: Run tests
+        run: pytest -q
+        # Five tests need real, proprietary SIPS3002 validation data not
+        # included in this repository (gated on DDSIM_SIPS3002_DIR /
+        # DDSIM_SIPS3002_FULL_N, unset here) -- they skip, not fail. See
+        # docs/PORTING_NOTES.md and README.md "Testing".
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ddsim (+ docs extra)
+        run: pip install -e ".[docs]"
+
+      - name: Build Sphinx docs
+        run: sphinx-build -b html docs/source docs/build/html
+        # No -W: the source has ~79 pre-existing docstring-formatting
+        # warnings (plain prose docstrings from the original 2007 port, not
+        # written for RST -- see conf.py), which are just noise, not
+        # breakage. This job is here to catch an actual build failure (a
+        # broken reference, an import error, a bad .rst) via sphinx-build's
+        # own non-zero exit code, which a plain warning doesn't trigger.

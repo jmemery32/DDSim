@@ -1,5 +1,7 @@
 # DDSim — Damage and Durability Simulator (Level I)
 
+[![tests](https://github.com/jmemery32/DDSim/actions/workflows/tests.yml/badge.svg)](https://github.com/jmemery32/DDSim/actions/workflows/tests.yml)
+
 DDSim Level I is a hierarchical, probabilistic fatigue-life predictor: given a
 linear-elastic finite-element stress field, it seeds an elliptical flaw at
 each candidate node (or a Monte Carlo set of flaws, from an analytical
@@ -117,6 +119,10 @@ docstrings.
 ```bash
 pytest
 ```
+
+Runs on every push/PR to `main` via GitHub Actions
+(`.github/workflows/tests.yml`: Ubuntu + macOS, Python 3.10-3.12, plus a
+separate job building the Sphinx docs) — see the badge above.
 
 Five tests need real, proprietary validation data not included in this
 repository (the NGC test-coupon geometry from the dissertation's validation
